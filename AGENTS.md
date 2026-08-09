@@ -62,7 +62,7 @@ Project agents in `.claude/agents/` register natively: dispatch them by name via
 | ------------- | -------------------------------------------------- | --------------------------------------------------------------- |
 | `planner`     | Before any non-trivial change                      | `.docs/plans/YYYY-MM-DD-<slug>.md`                              |
 | `implementer` | After a plan exists                                | Code changes, completion note on the plan                       |
-| `reviewer`    | After implementer finishes                         | Structured review with severity findings                        |
+| `reviewer`    | After implementer finishes                         | Severity-tagged findings; hunts escalation sequences, policy drift, wrong indexes, render-only defects |
 | `researcher`  | When you need codebase or external context         | `.docs/research/YYYY-MM-DD-<slug>.md`                           |
 | `debugger`    | When something is broken and root cause is unclear | Root cause analysis + proposed fix                              |
 | `learner`     | After a meaningful task, OR via `/learn`           | New entries in `.docs/learnings/`, edits to agents or AGENTS.md |
@@ -71,7 +71,8 @@ Project agents in `.claude/agents/` register natively: dispatch them by name via
 
 ### Routing heuristics
 
-- "Build me X" / "let's add feature X" of any non-trivial size: `planner` -> `implementer` -> `reviewer` -> `learner`. The planner writes a milestone+checkbox plan to `.docs/plans/`; the implementer ticks boxes live as it goes.
+- "Build me X" / "let's add feature X" of any non-trivial size: `planner` -> `implementer` -> `reviewer` -> `learner`. The planner writes a milestone+checkbox plan to `.docs/plans/`; the implementer ticks boxes live as it goes. The `reviewer` reads but never writes: it names the reproducing test, and the `implementer` writes it and the fix.
+- Anything touching `firestore.rules`, `firestore.indexes.json`, or `src/lib/permissions.ts`: always run `reviewer` afterwards, even for a one-line change. See `.docs/rules/firestore-rules-changes.md`.
 - "Continue / resume / pick up where we left off": find the `status: in-progress` plan in `.docs/plans/`, hand it to `implementer`.
 - "Fix this bug": `debugger` -> `implementer` (to apply the fix) -> `learner`.
 - "Where is X / how does Y work": `researcher`.
