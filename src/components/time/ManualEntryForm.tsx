@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { addDays } from "date-fns";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Input, Textarea } from "@/components/ui/Input";
@@ -86,18 +87,33 @@ export function ManualEntryForm({
   const startAt = combine(draft.date, draft.start);
   let endAt = combine(draft.date, draft.end);
   // A gig from 22:00 to 01:00 is one entry that runs past midnight, not a
-  // negative duration. Roll the end into the next day when it precedes the start.
-  if (startAt && endAt && endAt.getTime() <= startAt.getTime()) {
-    endAt = new Date(endAt.getTime() + 24 * 60 * 60 * 1000);
+  // negative duration. Roll the end into the next day when it PRECEDES the
+  // start; a strict comparison matters, because rolling over on equality would
+  // silently turn "19:00 to 19:00" into a 24-hour entry instead of hitting the
+  // zero-length check below. addDays rather than +24h so the roll stays correct
+  // across a DST boundary.
+  if (startAt && endAt && endAt.getTime() < startAt.getTime()) {
+    endAt = addDays(endAt, 1);
   }
 
   const minutes = startAt && endAt ? toMinutes(startAt, endAt) : 0;
 
+  /**
+   * Overlap check against the caller's other entries.
+   *
+   * A still-running entry counts too, treated as ending now, otherwise a
+   * retroactive entry could be dropped on top of the timer that is ticking
+   * right this moment. Scope caveat: `existingEntries` is whatever range the
+   * history page currently shows, so an overlap with something outside the
+   * visible week or month is not caught here. The server does not enforce
+   * uniqueness either; this is a guard rail, not an invariant.
+   */
   const overlap =
     startAt && endAt
       ? existingEntries.find((other) => {
-          if (other.id === entry?.id || !other.endTime) return false;
-          return other.startTime.getTime() < endAt!.getTime() && startAt.getTime() < other.endTime.getTime();
+          if (other.id === entry?.id) return false;
+          const otherEnd = other.endTime ?? new Date();
+          return other.startTime.getTime() < endAt!.getTime() && startAt.getTime() < otherEnd.getTime();
         })
       : undefined;
 

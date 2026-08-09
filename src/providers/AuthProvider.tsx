@@ -31,19 +31,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (next) => {
-      if (next) {
-        // Runs on every sign-in and every reload; ensureUserProfile is a no-op
-        // once the profile exists.
-        try {
-          await ensureUserProfile(next);
-        } catch {
-          // A failed profile write must not block sign-in; the bands page
-          // surfaces the resulting error state.
-        }
-      }
+    const unsubscribe = onAuthStateChanged(auth, (next) => {
+      // Release the app first. Awaiting the profile write here would hold the
+      // whole UI behind a Firestore round-trip on every single page load,
+      // including the overwhelmingly common case where the profile has existed
+      // for months. The profile is only needed by band-scoped screens, which
+      // render their own loading state anyway.
       setUser(next);
       setLoading(false);
+
+      if (next) {
+        // Idempotent: a no-op once the profile exists. A failure here must not
+        // block sign-in; the bands screen surfaces the resulting empty state.
+        void ensureUserProfile(next).catch(() => {});
+      }
     });
     return unsubscribe;
   }, []);

@@ -5,6 +5,7 @@ import { useAuth } from "./AuthProvider";
 import { useCollection, useDocument } from "@/hooks/useCollection";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { bandDoc, memberDoc, membersCol, userDoc } from "@/lib/firebase/paths";
+import { removeBandFromUser } from "@/lib/data/users";
 import * as perms from "@/lib/permissions";
 import type { Band, BandMember, UserProfile } from "@/types/models";
 
@@ -65,7 +66,23 @@ export function BandProvider({ children }: { children: React.ReactNode }) {
   );
 
   const bandRef = useMemo(() => (activeBandId ? bandDoc(activeBandId) : null), [activeBandId]);
-  const { data: band, loading: bandLoading } = useDocument(bandRef);
+  const { data: band, loading: bandLoading, error: bandError } = useDocument(bandRef);
+
+  /**
+   * Self-heal a stale `bandIds` entry.
+   *
+   * Removing a member deletes their member document, but the remover cannot
+   * write to somebody else's user profile (the rules deny it, correctly), so
+   * the removed user's `bandIds` still lists the band. Reading it then fails
+   * with permission-denied and the app would otherwise sit on an empty shell
+   * naming a band the user can no longer see, with no way out. The affected
+   * client is the only one allowed to fix its own profile, so it does.
+   */
+  useEffect(() => {
+    if (!user || !activeBandId) return;
+    if (bandError?.code !== "permission-denied") return;
+    void removeBandFromUser(user.uid, activeBandId).catch(() => {});
+  }, [user, activeBandId, bandError]);
 
   const memberRef = useMemo(
     () => (activeBandId && user ? memberDoc(activeBandId, user.uid) : null),

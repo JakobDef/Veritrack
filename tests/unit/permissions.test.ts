@@ -6,6 +6,7 @@ import {
   canEditPermissionRole,
   canEditTask,
   canEditTimeEntry,
+  canLeaveBand,
   canManageBand,
   canManageMembers,
   canReadBand,
@@ -127,13 +128,24 @@ describe("the two role concepts stay separate", () => {
 });
 
 describe("removing members", () => {
-  it("lets an admin remove anyone", () => {
+  it("lets an admin remove anyone else", () => {
     expect(canRemoveMember("member", admin)).toBe(true);
+    expect(canRemoveMember("viewer", admin)).toBe(true);
   });
 
-  it("lets anyone leave on their own", () => {
+  it("lets a plain member leave on their own", () => {
     expect(canRemoveMember("member", plain)).toBe(true);
-    expect(canRemoveMember("viewer", viewer)).toBe(true);
+    expect(canLeaveBand(plain)).toBe(true);
+  });
+
+  it("denies a viewer leaving, which would let them rejoin as a member", () => {
+    expect(canRemoveMember("viewer", viewer)).toBe(false);
+    expect(canLeaveBand(viewer)).toBe(false);
+  });
+
+  it("denies an admin leaving, which could strand the band", () => {
+    expect(canRemoveMember("admin", admin)).toBe(false);
+    expect(canLeaveBand(admin)).toBe(false);
   });
 
   it("denies removing somebody else without admin", () => {

@@ -86,8 +86,19 @@ export function canEditPermissionRole(targetUserId: string, member: Member): boo
   return isAdmin(member) && member!.id !== targetUserId;
 }
 
-/** Admins remove others; anyone may leave on their own. */
+/**
+ * Admins remove others. Leaving on your own is limited to plain members: a
+ * viewer who could leave would rejoin through the invite code as a member and
+ * undo their own demotion, and an admin who could leave could strand the band
+ * with nobody able to manage it. Both cases go through an admin instead.
+ */
 export function canRemoveMember(targetUserId: string, member: Member): boolean {
   if (!isActive(member)) return false;
-  return isAdmin(member) || member.id === targetUserId;
+  if (member.id === targetUserId) return member.permissionRole === "member";
+  return isAdmin(member);
+}
+
+/** Whether the current user may walk out of the band unaided. */
+export function canLeaveBand(member: Member): boolean {
+  return isActive(member) && member.permissionRole === "member";
 }

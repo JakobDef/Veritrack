@@ -16,7 +16,12 @@ import { useBand } from "@/providers/BandProvider";
 import { useTimeEntries } from "@/hooks/useTimeEntries";
 import { removeMember, updateFunctionalRole, updatePermissionRole } from "@/lib/data/members";
 import { leaveBand } from "@/lib/data/bands";
-import { canEditFunctionalRole, canEditPermissionRole, canRemoveMember } from "@/lib/permissions";
+import {
+  canEditFunctionalRole,
+  canEditPermissionRole,
+  canLeaveBand,
+  canRemoveMember,
+} from "@/lib/permissions";
 import { formatDuration } from "@/lib/time";
 import { roleColorVar } from "@/lib/roleColors";
 import {
@@ -114,10 +119,6 @@ export default function MembersPage() {
 
   async function confirmLeave() {
     if (!activeBandId || !user) return;
-    if (can.isAdmin && adminCount <= 1) {
-      toast("Ernenne zuerst einen anderen Admin.", "error");
-      return;
-    }
     setBusy(true);
     try {
       await leaveBand(activeBandId, user.uid);
@@ -239,10 +240,23 @@ export default function MembersPage() {
         </CardBody>
       </Card>
 
-      <Button variant="ghost" size="sm" className="text-danger self-start" onClick={() => setLeaveOpen(true)}>
-        <LogOut className="size-4" aria-hidden />
-        Band verlassen
-      </Button>
+      {canLeaveBand(member) ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-danger self-start"
+          onClick={() => setLeaveOpen(true)}
+        >
+          <LogOut className="size-4" aria-hidden />
+          Band verlassen
+        </Button>
+      ) : (
+        <p className="text-faint self-start text-xs">
+          {can.isAdmin
+            ? "Als Admin kannst du die Band nicht selbst verlassen. Übergib die Admin-Rolle, dann entfernt dich ein Admin."
+            : "Als Betrachter kannst du die Band nicht selbst verlassen. Ein Admin kann dich entfernen."}
+        </p>
+      )}
 
       <Dialog
         open={editing !== null}
@@ -276,7 +290,7 @@ export default function MembersPage() {
         loading={busy}
         confirmLabel="Entfernen"
         title={pendingRemove ? `${pendingRemove.displayName} entfernen?` : ""}
-        description="Die erfassten Zeiten bleiben in den Auswertungen erhalten. Mit einem gültigen Einladungscode kann die Person erneut beitreten."
+        description="Die erfassten Zeiten bleiben in den Auswertungen erhalten. Achtung: mit dem aktuellen Einladungscode kann die Person jederzeit wieder beitreten. Erneuere den Code, wenn das nicht passieren soll."
       />
 
       <ConfirmDialog

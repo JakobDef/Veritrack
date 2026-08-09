@@ -47,6 +47,12 @@ export type Band = {
   createdAt: Date;
   createdBy: string;
   inviteCode: string;
+  /**
+   * One-way latch. False only during band creation, while the creator seeds
+   * their own admin membership; the rules use it to close that window
+   * permanently afterwards. See `firestore.rules`.
+   */
+  seeded: boolean;
 };
 
 export type BandMember = {

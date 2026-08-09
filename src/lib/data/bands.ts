@@ -47,6 +47,8 @@ export async function createBand(
     createdAt: serverTimestamp(),
     createdBy: user.uid,
     inviteCode,
+    // One-way latch guarding the creator's admin-seed window; see firestore.rules.
+    seeded: false,
   });
 
   await setDoc(inviteCodeDoc(inviteCode).withConverter(null), {
@@ -65,6 +67,12 @@ export async function createBand(
     photoURL: user.photoURL ?? null,
     viaInviteCode: null,
   });
+
+  // Closes the admin-seed window now that the creator is an admin. Must come
+  // after the member write, because flipping the latch is itself an admin-only
+  // update. If this ever fails the creator keeps admin rights but the window
+  // stays open, so surface it rather than swallowing it.
+  await updateDoc(bandRef.withConverter(null), { seeded: true });
 
   await addBandToUser(user.uid, bandRef.id);
   return bandRef.id;

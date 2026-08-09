@@ -86,6 +86,7 @@ export const bandConverter: FirestoreDataConverter<Band> = {
       createdAt: toDate(d.createdAt),
       createdBy: str(d.createdBy),
       inviteCode: str(d.inviteCode),
+      seeded: d.seeded === true,
     };
   },
 };

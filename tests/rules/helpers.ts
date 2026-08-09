@@ -50,6 +50,8 @@ export async function seed(env: RulesTestEnvironment) {
       createdAt: new Date(),
       createdBy: ADMIN,
       inviteCode: INVITE_CODE,
+      // A fully created band: the creator's admin-seed window is closed.
+      seeded: true,
     });
 
     await setDoc(doc(db, "inviteCodes", INVITE_CODE), {

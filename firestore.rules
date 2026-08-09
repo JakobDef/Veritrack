@@ -47,13 +47,20 @@ service cloud.firestore {
       return /databases/$(database)/documents/bands/$(bandId);
     }
 
-    // True only for the person who created the band. This is what lets the
-    // creator seed their own admin member document: at that instant they are
-    // not yet a member, so isAdmin() cannot be true.
-    function isBandCreator(bandId) {
+    // The one-shot window in which the band's creator may seed their own admin
+    // member document: at that instant they are not yet a member, so isAdmin()
+    // cannot be true.
+    //
+    // `seeded` is what makes it one-shot. Deriving this from `createdBy` alone
+    // was a permanent back door: the creator could be demoted or removed, then
+    // delete-and-recreate their member document as admin, because `createdBy`
+    // is immutable and the branch stayed open forever. createBand flips
+    // `seeded` to true immediately after seeding, closing it for good.
+    function isSeedingCreator(bandId) {
       return isSignedIn()
         && exists(bandRef(bandId))
-        && get(bandRef(bandId)).data.createdBy == request.auth.uid;
+        && get(bandRef(bandId)).data.createdBy == request.auth.uid
+        && get(bandRef(bandId)).data.get('seeded', false) == false;
     }
 
     // Proof that the joiner knows a currently valid invite code for this band.
@@ -79,7 +86,7 @@ service cloud.firestore {
       allow list: if false;
       allow create: if isSignedIn()
         && request.resource.data.bandId is string
-        && (isBandCreator(request.resource.data.bandId) || isAdmin(request.resource.data.bandId));
+        && (isSeedingCreator(request.resource.data.bandId) || isAdmin(request.resource.data.bandId));
       allow delete: if isSignedIn() && isAdmin(resource.data.bandId);
       allow update: if false;
     }
@@ -93,10 +100,16 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.name is string
-        && request.resource.data.name.size() > 0;
+        && request.resource.data.name.size() > 0
+        && request.resource.data.get('seeded', false) == false;
 
+      // `seeded` is a one-way latch. Letting it go back to false would reopen
+      // the creator's admin-seed window, so a second admin could hand the
+      // founder a permanent back door.
       allow update: if isAdmin(bandId)
-        && request.resource.data.createdBy == resource.data.createdBy;
+        && request.resource.data.createdBy == resource.data.createdBy
+        && (resource.data.get('seeded', false) == false
+            || request.resource.data.get('seeded', false) == true);
       allow delete: if isAdmin(bandId);
 
       // ---- members ---------------------------------------------------------
@@ -111,8 +124,8 @@ service cloud.firestore {
           && request.auth.uid == memberId
           && request.resource.data.status == 'active'
           && (
-            // The creator seeding themselves as the first admin.
-            (request.resource.data.permissionRole == 'admin' && isBandCreator(bandId))
+            // The creator seeding themselves as the first admin, once.
+            (request.resource.data.permissionRole == 'admin' && isSeedingCreator(bandId))
             // Anyone joining with a valid invite code, always as a plain member.
             || (request.resource.data.permissionRole == 'member'
                 && inviteResolves(bandId, request.resource.data.viaInviteCode))
@@ -125,8 +138,18 @@ service cloud.firestore {
         // `resource.data` dereferences null and produces an evaluation error
         // instead of a clean deny. It still denies, but an errored branch would
         // silently swallow any `||` alternative added here later.
+        //
+        // Nobody changes their OWN permission role, admins included. An admin
+        // able to self-demote could strand a band with no admin at all, and the
+        // client already presents that as impossible.
         allow update: if resource != null && (
-          isAdmin(bandId)
+          (
+            isAdmin(bandId)
+            && (
+              request.auth.uid != memberId
+              || request.resource.data.permissionRole == resource.data.permissionRole
+            )
+          )
           || (
             request.auth.uid == memberId
             && isMember(bandId)
@@ -135,8 +158,16 @@ service cloud.firestore {
           )
         );
 
-        // Admins remove people; anyone may leave on their own.
-        allow delete: if isAdmin(bandId) || request.auth.uid == memberId;
+        // Admins remove people. Leaving on your own is limited to plain members,
+        // because deletion erases the only record of a demotion: a viewer who
+        // could leave would immediately rejoin through the invite code as a
+        // member, undoing the demotion, and an admin who could leave could
+        // strand the band. Both of those go through an admin instead.
+        // An admin removes OTHER people, never themselves: self-removal would
+        // strand a single-admin band. The way out for an admin is to be demoted
+        // by a second admin first, after which the plain-member branch applies.
+        allow delete: if (isAdmin(bandId) && request.auth.uid != memberId)
+          || (request.auth.uid == memberId && resource.data.permissionRole == 'member');
       }
 
       // ---- projects --------------------------------------------------------

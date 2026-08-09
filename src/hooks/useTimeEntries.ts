@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { orderBy, query, where } from "firebase/firestore";
+import { limit, orderBy, query, where } from "firebase/firestore";
 import { useCollection } from "./useCollection";
 import { timeEntriesCol } from "@/lib/firebase/paths";
 import type { DateRange } from "@/lib/dates";
@@ -16,6 +16,13 @@ import type { DateRange } from "@/lib/dates";
  * Every combination used here is declared in firestore.indexes.json. The
  * emulator does not enforce indexes, so a missing declaration only ever fails
  * against a real project.
+ *
+ * Known limit: callers that compute an all-time total (per project, per member)
+ * pass neither `range` nor `max`, so they subscribe to the band's whole
+ * history. That is deliberate. Capping it with `limit()` would silently produce
+ * a wrong total, which is worse than a large read. The real fix is a stored
+ * aggregate updated on write; until a band's history is big enough to notice,
+ * the honest total wins.
  */
 export function useTimeEntries({
   bandId,
@@ -43,12 +50,15 @@ export function useTimeEntries({
       constraints.push(where("startTime", ">=", new Date(fromMs)));
       constraints.push(where("startTime", "<=", new Date(toMs)));
     }
+    // `max` is a real `limit()`, not a client-side slice. Without it the
+    // dashboard's "last six entries" would open a live listener over the user's
+    // entire history and throw almost all of it away, and that cost grows with
+    // every entry the band ever records.
+    if (max) constraints.push(limit(max));
     return query(timeEntriesCol(bandId), ...constraints, orderBy("startTime", "desc"));
-  }, [bandId, userId, fromMs, toMs]);
+  }, [bandId, userId, fromMs, toMs, max]);
 
-  const { data, loading, error } = useCollection(q);
-
-  const entries = useMemo(() => (max ? data.slice(0, max) : data), [data, max]);
+  const { data: entries, loading, error } = useCollection(q);
 
   const totalMinutes = useMemo(
     () => entries.reduce((sum, entry) => sum + (entry.duration ?? 0), 0),
