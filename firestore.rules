@@ -1,0 +1,185 @@
+rules_version = '2';
+
+// Veritrack security rules.
+//
+// Principles:
+//   - Band data is readable only by that band's active members.
+//   - Time entries are writable only by the user they belong to, or by an admin.
+//   - Band settings, projects and member management are admin-only.
+//   - `permissionRole` (admin | member | viewer) is the ONLY thing that grants
+//     rights. `role` is the functional role ("Gitarre") and is deliberately
+//     never consulted here.
+//
+// Client-side mirrors of this logic live in src/lib/permissions.ts. Both are
+// asserted against the same matrix by tests/rules and tests/unit/permissions.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function memberRef(bandId) {
+      return /databases/$(database)/documents/bands/$(bandId)/members/$(request.auth.uid);
+    }
+
+    function memberData(bandId) {
+      return get(memberRef(bandId)).data;
+    }
+
+    function isMember(bandId) {
+      return isSignedIn()
+        && exists(memberRef(bandId))
+        && memberData(bandId).status == 'active';
+    }
+
+    function isAdmin(bandId) {
+      return isMember(bandId) && memberData(bandId).permissionRole == 'admin';
+    }
+
+    // Admin or member. Excludes viewer, who is strictly read-only.
+    function canWrite(bandId) {
+      return isMember(bandId) && memberData(bandId).permissionRole in ['admin', 'member'];
+    }
+
+    function bandRef(bandId) {
+      return /databases/$(database)/documents/bands/$(bandId);
+    }
+
+    // True only for the person who created the band. This is what lets the
+    // creator seed their own admin member document: at that instant they are
+    // not yet a member, so isAdmin() cannot be true.
+    function isBandCreator(bandId) {
+      return isSignedIn()
+        && exists(bandRef(bandId))
+        && get(bandRef(bandId)).data.createdBy == request.auth.uid;
+    }
+
+    // Proof that the joiner knows a currently valid invite code for this band.
+    // Regenerating the code deletes the old lookup document, which is what makes
+    // old invite links stop working and stops a removed member rejoining.
+    function inviteResolves(bandId, code) {
+      return code is string
+        && exists(/databases/$(database)/documents/inviteCodes/$(code))
+        && get(/databases/$(database)/documents/inviteCodes/$(code)).data.bandId == bandId;
+    }
+
+    // ---- users -------------------------------------------------------------
+    // Only the owner. Everything another member needs to render (display name,
+    // photo) is denormalized onto the band member document instead.
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ---- invite code lookup ------------------------------------------------
+    match /inviteCodes/{code} {
+      // Single-document reads only. Listing would leak every band's invite.
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn()
+        && request.resource.data.bandId is string
+        && (isBandCreator(request.resource.data.bandId) || isAdmin(request.resource.data.bandId));
+      allow delete: if isSignedIn() && isAdmin(resource.data.bandId);
+      allow update: if false;
+    }
+
+    // ---- bands -------------------------------------------------------------
+    match /bands/{bandId} {
+      allow get: if isMember(bandId);
+      // The app resolves bands through users/{uid}.bandIds, never by listing.
+      allow list: if false;
+
+      allow create: if isSignedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0;
+
+      allow update: if isAdmin(bandId)
+        && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isAdmin(bandId);
+
+      // ---- members ---------------------------------------------------------
+      match /members/{memberId} {
+        allow read: if isMember(bandId);
+
+        allow create: if isSignedIn()
+          && request.auth.uid == memberId
+          && request.resource.data.status == 'active'
+          && (
+            // The creator seeding themselves as the first admin.
+            (request.resource.data.permissionRole == 'admin' && isBandCreator(bandId))
+            // Anyone joining with a valid invite code, always as a plain member.
+            || (request.resource.data.permissionRole == 'member'
+                && inviteResolves(bandId, request.resource.data.viaInviteCode))
+          );
+
+        // A member may change their own functional role and color, never their
+        // own permission level or status. Admins may change anything.
+        // `resource != null` guard: a set() on a not-yet-existing document is
+        // evaluated against the update rule too, and without the guard
+        // `resource.data` dereferences null and produces an evaluation error
+        // instead of a clean deny. It still denies, but an errored branch would
+        // silently swallow any `||` alternative added here later.
+        allow update: if resource != null && (
+          isAdmin(bandId)
+          || (
+            request.auth.uid == memberId
+            && isMember(bandId)
+            && request.resource.data.permissionRole == resource.data.permissionRole
+            && request.resource.data.status == resource.data.status
+          )
+        );
+
+        // Admins remove people; anyone may leave on their own.
+        allow delete: if isAdmin(bandId) || request.auth.uid == memberId;
+      }
+
+      // ---- projects --------------------------------------------------------
+      match /projects/{projectId} {
+        allow read: if isMember(bandId);
+        allow create, update, delete: if isAdmin(bandId);
+
+        // ---- tasks ---------------------------------------------------------
+        match /tasks/{taskId} {
+          allow read: if isMember(bandId);
+          // bandId/projectId are denormalized for the collection-group query;
+          // pinning them here stops a task claiming to belong elsewhere.
+          allow create: if canWrite(bandId)
+            && request.resource.data.bandId == bandId
+            && request.resource.data.projectId == projectId;
+          allow update: if canWrite(bandId)
+            && request.resource.data.bandId == resource.data.bandId
+            && request.resource.data.projectId == resource.data.projectId;
+          allow delete: if canWrite(bandId);
+        }
+      }
+
+      // ---- time entries ----------------------------------------------------
+      match /timeEntries/{entryId} {
+        allow read: if isMember(bandId);
+
+        allow create: if canWrite(bandId)
+          && request.resource.data.userId == request.auth.uid;
+
+        // Own entry, or an admin correcting someone else's. An update may never
+        // reassign the entry to a different user.
+        allow update: if request.resource.data.userId == resource.data.userId
+          && (
+            isAdmin(bandId)
+            || (canWrite(bandId) && resource.data.userId == request.auth.uid)
+          );
+
+        allow delete: if isAdmin(bandId)
+          || (canWrite(bandId) && resource.data.userId == request.auth.uid);
+      }
+    }
+
+    // ---- collection group: my tasks across all projects ---------------------
+    // Backs the dashboard's "assigned to me" list. Relies on the denormalized
+    // bandId, and is still gated on band membership per document.
+    match /{path=**}/tasks/{taskId} {
+      allow read: if isMember(resource.data.bandId);
+    }
+  }
+}

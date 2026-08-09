@@ -1,0 +1,248 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+ * Veritrack design tokens
+ *
+ * Tailwind v4 is CSS-first: there is no tailwind.config.ts. The raw values live
+ * on :root / .dark below, and `@theme inline` maps them onto Tailwind's color
+ * namespace so utilities read `bg-surface`, `text-muted`, `border-border`.
+ * `inline` matters: it makes Tailwind emit `var(--vt-*)` rather than baking the
+ * literal value, which is what lets `.dark` override a single variable and
+ * retheme the whole app.
+ *
+ * Rules for anyone adding UI:
+ *   - Never write a raw hex or a Tailwind palette color (`text-gray-500`) in a
+ *     component. If a shade is missing, add a token here.
+ *   - Surfaces stack: bg (page) < surface (card) < surface-2 (inset/hover).
+ *   - `accent` is the ember used for primary actions and the running timer.
+ *     It is the only saturated color in the base UI; everything else is neutral
+ *     so the timer genuinely stands out.
+ *   - `role-1..8` are the fixed functional-role / project colors. They are
+ *     picked to stay legible as fills on both themes and to read as distinct
+ *     hues in Recharts series.
+ *
+ * Scales: spacing is Tailwind's default 4px rhythm. Radius and shadow are
+ * defined here as a deliberate 4-step scale; do not invent one-off values.
+ * ------------------------------------------------------------------------- */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* Neutrals: warm-tinted, never pure grey. Paper, not screen. */
+  --vt-bg: #f7f5f2;
+  --vt-surface: #ffffff;
+  --vt-surface-2: #f1eee9;
+  --vt-border: #e4dfd7;
+  --vt-border-strong: #cfc7bb;
+  --vt-text: #1c1917;
+  --vt-muted: #78716c;
+  --vt-faint: #a8a29e;
+
+  /* Ember accent: stage light. Primary actions + the running timer. */
+  --vt-accent: #c2410c;
+  --vt-accent-hover: #9a3412;
+  --vt-accent-fg: #ffffff;
+  --vt-accent-soft: #fdf0e7;
+  --vt-accent-ring: #f0834f;
+
+  /* Semantic */
+  --vt-success: #15803d;
+  --vt-success-soft: #eaf6ee;
+  --vt-warning: #b45309;
+  --vt-warning-soft: #fdf3e3;
+  --vt-danger: #b91c1c;
+  --vt-danger-soft: #fdecec;
+
+  /* Functional-role / project palette */
+  --vt-role-1: #d9541f;
+  --vt-role-2: #b98600;
+  --vt-role-3: #3f8f52;
+  --vt-role-4: #0f8f92;
+  --vt-role-5: #2f74b5;
+  --vt-role-6: #5b5fd0;
+  --vt-role-7: #9b4a97;
+  --vt-role-8: #c93f66;
+
+  --vt-shadow-sm: 0 1px 2px 0 rgb(28 25 23 / 0.05);
+  --vt-shadow-md: 0 4px 12px -2px rgb(28 25 23 / 0.08), 0 2px 4px -2px rgb(28 25 23 / 0.05);
+  --vt-shadow-lg: 0 12px 32px -8px rgb(28 25 23 / 0.14), 0 4px 8px -4px rgb(28 25 23 / 0.06);
+  --vt-shadow-glow: 0 0 0 1px var(--vt-accent-ring), 0 8px 28px -6px rgb(194 65 12 / 0.28);
+}
+
+.dark {
+  --vt-bg: #121110;
+  --vt-surface: #1b1917;
+  --vt-surface-2: #262220;
+  --vt-border: #302b28;
+  --vt-border-strong: #453e39;
+  --vt-text: #f5f1ec;
+  --vt-muted: #a29a92;
+  --vt-faint: #78716c;
+
+  --vt-accent: #f97316;
+  --vt-accent-hover: #fb923c;
+  --vt-accent-fg: #1a0f05;
+  --vt-accent-soft: #2b1a0f;
+  --vt-accent-ring: #b45309;
+
+  --vt-success: #4ade80;
+  --vt-success-soft: #10241a;
+  --vt-warning: #fbbf24;
+  --vt-warning-soft: #2a1f0c;
+  --vt-danger: #f87171;
+  --vt-danger-soft: #2a1414;
+
+  /* Lifted for legibility against dark surfaces. */
+  --vt-role-1: #fb7a4b;
+  --vt-role-2: #e0ac2b;
+  --vt-role-3: #5fbd75;
+  --vt-role-4: #2fbcbf;
+  --vt-role-5: #5f9fdd;
+  --vt-role-6: #8b8ef0;
+  --vt-role-7: #c576c0;
+  --vt-role-8: #ee6f92;
+
+  --vt-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --vt-shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --vt-shadow-lg: 0 12px 32px -8px rgb(0 0 0 / 0.6), 0 4px 8px -4px rgb(0 0 0 / 0.4);
+  --vt-shadow-glow: 0 0 0 1px var(--vt-accent-ring), 0 8px 28px -6px rgb(249 115 22 / 0.35);
+}
+
+@theme inline {
+  --color-bg: var(--vt-bg);
+  --color-surface: var(--vt-surface);
+  --color-surface-2: var(--vt-surface-2);
+  --color-border: var(--vt-border);
+  --color-border-strong: var(--vt-border-strong);
+  --color-text: var(--vt-text);
+  --color-muted: var(--vt-muted);
+  --color-faint: var(--vt-faint);
+
+  --color-accent: var(--vt-accent);
+  --color-accent-hover: var(--vt-accent-hover);
+  --color-accent-fg: var(--vt-accent-fg);
+  --color-accent-soft: var(--vt-accent-soft);
+  --color-accent-ring: var(--vt-accent-ring);
+
+  --color-success: var(--vt-success);
+  --color-success-soft: var(--vt-success-soft);
+  --color-warning: var(--vt-warning);
+  --color-warning-soft: var(--vt-warning-soft);
+  --color-danger: var(--vt-danger);
+  --color-danger-soft: var(--vt-danger-soft);
+
+  --color-role-1: var(--vt-role-1);
+  --color-role-2: var(--vt-role-2);
+  --color-role-3: var(--vt-role-3);
+  --color-role-4: var(--vt-role-4);
+  --color-role-5: var(--vt-role-5);
+  --color-role-6: var(--vt-role-6);
+  --color-role-7: var(--vt-role-7);
+  --color-role-8: var(--vt-role-8);
+
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+
+  --shadow-sm: var(--vt-shadow-sm);
+  --shadow-md: var(--vt-shadow-md);
+  --shadow-lg: var(--vt-shadow-lg);
+  --shadow-glow: var(--vt-shadow-glow);
+}
+
+@layer base {
+  * {
+    border-color: var(--vt-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--vt-bg);
+    color: var(--vt-text);
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  /* One consistent focus ring everywhere, including for keyboard users only. */
+  :focus-visible {
+    outline: 2px solid var(--vt-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Numbers that change every second must not reflow their container. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  ::selection {
+    background-color: var(--vt-accent);
+    color: var(--vt-accent-fg);
+  }
+
+  /* Firefox/Chrome scrollbars tuned to the surface palette. */
+  * {
+    scrollbar-color: var(--vt-border-strong) transparent;
+    scrollbar-width: thin;
+  }
+}
+
+@layer utilities {
+  /* Slow breathing pulse for the live-timer indicator. Distinct from
+     Tailwind's animate-pulse, which is too fast and too dim to read as "live". */
+  @keyframes vt-live-pulse {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.86);
+    }
+  }
+
+  .animate-live {
+    animation: vt-live-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes vt-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .animate-fade-up {
+    animation: vt-fade-up 0.18s ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-live,
+    .animate-fade-up {
+      animation: none;
+    }
+  }
+}

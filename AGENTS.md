@@ -58,14 +58,14 @@ Always start Claude Code from this repo's root, not from a parent folder. Sessio
 
 Project agents in `.claude/agents/` register natively: dispatch them by name via the Agent tool.
 
-| Agent | When to call | Output |
-|-------|--------------|--------|
-| `planner` | Before any non-trivial change | `.docs/plans/YYYY-MM-DD-<slug>.md` |
-| `implementer` | After a plan exists | Code changes, completion note on the plan |
-| `reviewer` | After implementer finishes | Structured review with severity findings |
-| `researcher` | When you need codebase or external context | `.docs/research/YYYY-MM-DD-<slug>.md` |
-| `debugger` | When something is broken and root cause is unclear | Root cause analysis + proposed fix |
-| `learner` | After a meaningful task, OR via `/learn` | New entries in `.docs/learnings/`, edits to agents or AGENTS.md |
+| Agent         | When to call                                       | Output                                                          |
+| ------------- | -------------------------------------------------- | --------------------------------------------------------------- |
+| `planner`     | Before any non-trivial change                      | `.docs/plans/YYYY-MM-DD-<slug>.md`                              |
+| `implementer` | After a plan exists                                | Code changes, completion note on the plan                       |
+| `reviewer`    | After implementer finishes                         | Structured review with severity findings                        |
+| `researcher`  | When you need codebase or external context         | `.docs/research/YYYY-MM-DD-<slug>.md`                           |
+| `debugger`    | When something is broken and root cause is unclear | Root cause analysis + proposed fix                              |
+| `learner`     | After a meaningful task, OR via `/learn`           | New entries in `.docs/learnings/`, edits to agents or AGENTS.md |
 
 <!-- Project-tailored agents (added by Phase 2 for existing repos) are appended to this table. -->
 
@@ -82,6 +82,7 @@ If the user says any of "learn from that", "remember this", "don't make that mis
 ## Self-improvement loop (this is core, do not skip it)
 
 After completing any non-trivial task, invoke the `learner` subagent. Non-trivial means at least one of:
+
 - Involved a bug fix
 - Made an architecture or design decision
 - Surfaced a constraint that was not previously documented
@@ -138,10 +139,20 @@ No verification commands exist yet. See `.docs/rules/verification.md`, which mus
 
 ### Key paths
 
-| Path | Purpose |
-|------|---------|
-| `.claude/` | AI machinery: agents, commands, hooks, permissions |
-| `.docs/` | Plans, learnings, rules, research |
-| `AGENTS.md` | Project instructions (single source of truth) |
+| Path        | Purpose                                            |
+| ----------- | -------------------------------------------------- |
+| `.claude/`  | AI machinery: agents, commands, hooks, permissions |
+| `.docs/`    | Plans, learnings, rules, research                  |
+| `AGENTS.md` | Project instructions (single source of truth)      |
 
 Source, test, and asset paths get added here once they exist.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
