@@ -1,15 +1,16 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 export type Theme = "light" | "dark" | "system";
 
 const STORAGE_KEY = "veritrack:theme";
 
 /**
- * Runs before first paint (injected into <head> in layout.tsx) so the correct
- * theme class is on <html> before React hydrates. Without this the page flashes
- * light-then-dark on every load. Kept as a string because it must be inlined.
+ * Runs before first paint (inlined into <head> in layout.tsx) so the correct
+ * theme class is on <html> before React hydrates. Without it the page flashes
+ * light-then-dark on every load. Kept as a string because it must be inline.
  */
 export const themeInitScript = `
 (function () {
@@ -29,65 +30,45 @@ type ThemeContextValue = {
   /** What is actually rendered right now. */
   resolved: "light" | "dark";
   setTheme: (theme: Theme) => void;
-  toggle: () => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function systemPrefersDark() {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-function apply(theme: Theme): "light" | "dark" {
-  const resolved = theme === "system" ? (systemPrefersDark() ? "dark" : "light") : theme;
-  document.documentElement.classList.toggle("dark", resolved === "dark");
-  document.documentElement.style.colorScheme = resolved;
-  return resolved;
-}
-
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Start at "system" on both server and client so the first render matches the
-  // server HTML; the real stored value is read in the effect below. The inline
-  // script has already painted the right colors, so there is no visible flash.
-  const [theme, setThemeState] = useState<Theme>("system");
-  const [resolved, setResolved] = useState<"light" | "dark">("light");
+  const [stored, setStored] = useLocalStorage(STORAGE_KEY);
+  const theme: Theme = stored === "light" || stored === "dark" ? stored : "system";
+
+  // Only consulted while `theme` is "system"; kept in state so an OS-level
+  // change re-renders.
+  const [systemDark, setSystemDark] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    const initial: Theme = stored ?? "system";
-    setThemeState(initial);
-    setResolved(apply(initial));
-  }, []);
-
-  // Follow the OS while the user is on "system".
-  useEffect(() => {
-    if (theme !== "system") return;
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setResolved(apply("system"));
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, [theme]);
-
-  const setTheme = useCallback((next: Theme) => {
-    setThemeState(next);
-    setResolved(apply(next));
-    try {
-      if (next === "system") localStorage.removeItem(STORAGE_KEY);
-      else localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // Private mode / storage disabled: theme still applies for this session.
-    }
+    const sync = () => setSystemDark(mql.matches);
+    sync();
+    mql.addEventListener("change", sync);
+    return () => mql.removeEventListener("change", sync);
   }, []);
 
-  const toggle = useCallback(() => {
-    setTheme(resolved === "dark" ? "light" : "dark");
-  }, [resolved, setTheme]);
+  const resolved: "light" | "dark" = theme === "system" ? (systemDark ? "dark" : "light") : theme;
 
-  return (
-    <ThemeContext.Provider value={{ theme, resolved, setTheme, toggle }}>
-      {children}
-    </ThemeContext.Provider>
+  // Sync the class to the DOM, an external system: exactly what effects are for.
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", resolved === "dark");
+    document.documentElement.style.colorScheme = resolved;
+  }, [resolved]);
+
+  const setTheme = useCallback(
+    (next: Theme) => setStored(next === "system" ? null : next),
+    [setStored],
   );
+
+  const value = useMemo(
+    () => ({ theme, resolved, setTheme }),
+    [theme, resolved, setTheme],
+  );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {

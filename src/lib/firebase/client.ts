@@ -29,7 +29,6 @@ export const db = getFirestore(app);
  * has to live on `globalThis`, which survives.
  */
 declare global {
-  // eslint-disable-next-line no-var
   var __VERITRACK_EMULATORS_CONNECTED__: boolean | undefined;
 }
 

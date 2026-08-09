@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { ThemeProvider, themeInitScript } from "@/providers/ThemeProvider";
+import { AuthProvider } from "@/providers/AuthProvider";
+import { BandProvider } from "@/providers/BandProvider";
 import { ToastProvider } from "@/components/ui/Toast";
 import "./globals.css";
 
@@ -31,6 +33,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // The only literal colors in the app. Browser chrome reads this before any
+  // stylesheet, so it cannot resolve a CSS variable. Keep in sync with
+  // --vt-bg in globals.css.
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f7f5f2" },
     { media: "(prefers-color-scheme: dark)", color: "#121110" },
@@ -48,7 +53,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${spaceGrotesk.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <ThemeProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <BandProvider>{children}</BandProvider>
+            </AuthProvider>
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

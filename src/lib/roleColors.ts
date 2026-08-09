@@ -21,15 +21,20 @@ export const ROLE_COLOR_KEYS = [
 
 export type RoleColorKey = (typeof ROLE_COLOR_KEYS)[number];
 
+/**
+ * Labels match the slot order defined in globals.css. That order is validated
+ * for colour-vision separation between neighbouring slots, so do not resequence
+ * these without re-running the palette validator.
+ */
 export const ROLE_COLOR_LABELS: Record<RoleColorKey, string> = {
   "role-1": "Ember",
-  "role-2": "Amber",
-  "role-3": "Moos",
-  "role-4": "Türkis",
-  "role-5": "Himmel",
+  "role-2": "Türkis",
+  "role-3": "Gold",
+  "role-4": "Pflaume",
+  "role-5": "Moos",
   "role-6": "Indigo",
-  "role-7": "Pflaume",
-  "role-8": "Rose",
+  "role-7": "Rose",
+  "role-8": "Himmel",
 };
 
 export function isRoleColorKey(value: string): value is RoleColorKey {

@@ -101,7 +101,11 @@ service cloud.firestore {
 
       // ---- members ---------------------------------------------------------
       match /members/{memberId} {
-        allow read: if isMember(bandId);
+        // Members see the whole roster. A user may always read their OWN member
+        // document even when they are not (yet) a member: the join flow checks
+        // "am I already in this band?" before writing, and that check would
+        // otherwise be denied for exactly the people it exists for.
+        allow read: if isMember(bandId) || request.auth.uid == memberId;
 
         allow create: if isSignedIn()
           && request.auth.uid == memberId

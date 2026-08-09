@@ -123,29 +123,65 @@ This rule applies to any agent that edits `.claude/agents/` (including the learn
 
 ## Project-specific section
 
-This repo is greenfield: an empty directory at bootstrap time, with no source, no manifest, and no chosen stack. The entries below are placeholders on purpose. Fill them in (and update `.docs/rules/verification.md` in the same change) as soon as the stack is chosen and the first code lands. Do not treat the placeholders as facts.
+Veritrack is a band collaboration web app: members and roles, one-click time tracking, projects, a Kanban board, a shared timetable and statistics. The dashboard timer is the product's centre of gravity, not one feature among many; a change that adds friction to starting a timer is a regression.
 
 ### Stack
 
-Not yet chosen. Nothing is installed and no manifest exists.
+- Next.js 16 (App Router) with React 19 and TypeScript in strict mode (`noUncheckedIndexedAccess` on)
+- Tailwind v4, configured CSS-first: design tokens live in an `@theme` block inside `src/app/globals.css`, there is no `tailwind.config.ts`
+- Firebase Auth + Firestore through the client SDK only; no server SDK, no API routes
+- Recharts 3 for the statistics charts, date-fns for all date maths
+- Vitest for unit tests, `@firebase/rules-unit-testing` for security-rules tests
+- npm as the package manager (there is no pnpm on this machine)
 
 ### How to run
 
-No dev, build, or start command exists yet.
+```
+npm install
+npm run dev:all      # Firebase emulators (auth 9099, firestore 8080, UI 4000) plus Next.js on 3000
+```
+
+`npm run dev` on its own starts only the web app and cannot reach Firebase. The emulator needs Java on PATH.
+
+Development runs entirely against the emulators, so no real Firebase credentials are required. `.env.local` holds placeholder values plus `NEXT_PUBLIC_USE_EMULATOR=true`.
+
+**Switching to a real Firebase project**
+
+1. Create the project, add a Web app, and copy its config into `.env.local` (all six `NEXT_PUBLIC_FIREBASE_*` values). `.env.example` documents each one.
+2. Set `NEXT_PUBLIC_USE_EMULATOR=false`. That single flag is what stops the SDK pointing at `127.0.0.1`.
+3. Enable Authentication, Sign-in method, then Google and Email/Password.
+4. `firebase use <project-id>`, then `firebase deploy --only firestore` to publish `firestore.rules` and `firestore.indexes.json`. The emulator does not enforce composite indexes, so a query that works locally can still fail in production if its index was never declared.
+5. Hosting config exists in `firebase.json` but has deliberately never been deployed. It uses the framework-aware path (`"source": "."`), which is the experimental Next.js integration: try it against a staging project before pointing a domain at it.
 
 ### Verification
 
-No verification commands exist yet. See `.docs/rules/verification.md`, which must be filled in with the real typecheck / lint / test commands the moment a toolchain is added.
+See `.docs/rules/verification.md` for the commands and the order to run them. Short version: `npm run typecheck`, `npm run lint`, `npm run build`, `npm test`, `npm run test:rules`.
 
 ### Key paths
 
-| Path        | Purpose                                            |
-| ----------- | -------------------------------------------------- |
-| `.claude/`  | AI machinery: agents, commands, hooks, permissions |
-| `.docs/`    | Plans, learnings, rules, research                  |
-| `AGENTS.md` | Project instructions (single source of truth)      |
+| Path | Purpose |
+|------|---------|
+| `src/app/(auth)/` | Login and signup, unauthenticated shell |
+| `src/app/(app)/` | Authenticated shell and every product route |
+| `src/components/ui/` | Design-system primitives, no feature logic |
+| `src/components/timer/` | Dashboard timer, project picker, persistent bar |
+| `src/lib/firebase/` | Client singleton, typed path builders, converters |
+| `src/lib/data/` | All Firestore writes, one module per collection |
+| `src/lib/` | Pure helpers: time, dates, stats, permissions, colors |
+| `src/providers/` | Auth, active band and theme context |
+| `src/hooks/` | `onSnapshot` subscriptions and local storage |
+| `firestore.rules` | Security rules, mirrored by `src/lib/permissions.ts` |
+| `tests/rules/` | Emulator-backed rules tests |
+| `src/app/styleguide/` | Every primitive rendered in both themes |
 
-Source, test, and asset paths get added here once they exist.
+### Conventions that are easy to get wrong
+
+- **Reads go through converters, writes go through `withConverter(null)`.** Write payloads carry `serverTimestamp()` and `arrayUnion()` sentinels and never carry `id`; forcing them through the read converter only produces casts.
+- **The two role concepts never merge.** `role` is functional and cosmetic ("Gitarre"); `permissionRole` is `admin | member | viewer` and is the only thing that grants rights. Separate fields, separate UI controls, separate update functions in `src/lib/data/members.ts`.
+- **Memoize every Firestore query** before it reaches `useCollection`. It compares with `queryEqual`, but an unmemoized inline query still churns the memo on every render.
+- **No raw hex or Tailwind palette colors in components.** Add a token to `globals.css` instead. The `role-1..8` slot order is validated for colour-vision separation between neighbouring slots, so re-run the palette validator before reordering or restyling it.
+- **Dates are local-time throughout.** Firestore Timestamps are UTC instants; the calendar and every per-day total bucket by the viewer's local day via `src/lib/dates.ts`. An entry crossing midnight belongs entirely to its start day.
+- **Starting a timer stops any timer already running for that user.** That is the single-running-timer guard and it also makes "switch project" one click. It lives in `startTimer`, not in the rules.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

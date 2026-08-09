@@ -53,15 +53,21 @@
   --vt-danger: #b91c1c;
   --vt-danger-soft: #fdecec;
 
-  /* Functional-role / project palette */
-  --vt-role-1: #d9541f;
-  --vt-role-2: #b98600;
-  --vt-role-3: #3f8f52;
-  --vt-role-4: #0f8f92;
-  --vt-role-5: #2f74b5;
-  --vt-role-6: #5b5fd0;
-  --vt-role-7: #9b4a97;
-  --vt-role-8: #c93f66;
+  /* Functional-role / project palette.
+     Slot ORDER is load-bearing, not decorative: colors are handed out in this
+     sequence, so neighbouring slots are the pairs most likely to appear side by
+     side in a chart. The order was solved for, then verified with the dataviz
+     validator: all six checks pass in both themes (lightness band, chroma floor,
+     protan/deutan/tritan separation, normal-vision separation, surface contrast).
+     Re-run the validator before changing any value or reordering. */
+  --vt-role-1: #d95f1f; /* Ember  */
+  --vt-role-2: #0e968f; /* Türkis */
+  --vt-role-3: #c99400; /* Gold   */
+  --vt-role-4: #a8479f; /* Pflaume */
+  --vt-role-5: #4f9a35; /* Moos   */
+  --vt-role-6: #6b62dd; /* Indigo */
+  --vt-role-7: #d13f6b; /* Rose   */
+  --vt-role-8: #2b7fc0; /* Himmel */
 
   --vt-shadow-sm: 0 1px 2px 0 rgb(28 25 23 / 0.05);
   --vt-shadow-md: 0 4px 12px -2px rgb(28 25 23 / 0.08), 0 2px 4px -2px rgb(28 25 23 / 0.05);
@@ -92,15 +98,17 @@
   --vt-danger: #f87171;
   --vt-danger-soft: #2a1414;
 
-  /* Lifted for legibility against dark surfaces. */
-  --vt-role-1: #fb7a4b;
-  --vt-role-2: #e0ac2b;
-  --vt-role-3: #5fbd75;
-  --vt-role-4: #2fbcbf;
-  --vt-role-5: #5f9fdd;
-  --vt-role-6: #8b8ef0;
-  --vt-role-7: #c576c0;
-  --vt-role-8: #ee6f92;
+  /* Independently chosen for the dark surface, not a mechanical lightening of
+     the light values: the dark lightness band is narrower (L 0.48-0.67) and a
+     naive lift pushes every hue out of it. Same slot order, separately validated. */
+  --vt-role-1: #e8651f; /* Ember  */
+  --vt-role-2: #0f9b93; /* Türkis */
+  --vt-role-3: #b9890a; /* Gold   */
+  --vt-role-4: #ac52a4; /* Pflaume */
+  --vt-role-5: #54a038; /* Moos   */
+  --vt-role-6: #7a72e2; /* Indigo */
+  --vt-role-7: #d84e72; /* Rose   */
+  --vt-role-8: #3486c6; /* Himmel */
 
   --vt-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
   --vt-shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);

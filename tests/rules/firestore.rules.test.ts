@@ -62,6 +62,14 @@ describe("band reads", () => {
   it("denies a non-member reading time entries", async () => {
     await assertFails(getDoc(entryRef(as(env, OUTSIDER), ENTRY_OF_MEMBER)));
   });
+
+  it("lets a non-member read their own member document, which the join flow needs", async () => {
+    await assertSucceeds(getDoc(memberRef(as(env, OUTSIDER), OUTSIDER)));
+  });
+
+  it("still denies a non-member reading somebody else's member document", async () => {
+    await assertFails(getDoc(memberRef(as(env, OUTSIDER), MEMBER)));
+  });
 });
 
 describe("band settings", () => {
