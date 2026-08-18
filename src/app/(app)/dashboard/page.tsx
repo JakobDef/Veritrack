@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Clock3, FolderKanban, ListTodo, Timer } from "lucide-react";
+import { CalendarDays, Clock3, FolderKanban, ListTodo, Play, Timer } from "lucide-react";
 import { TimerHero } from "@/components/timer/TimerHero";
 import { TeamActivity } from "@/components/timer/TeamActivity";
 import { StatNugget } from "@/components/stats/StatNugget";
@@ -10,21 +10,27 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import { Badge } from "@/components/ui/Badge";
+import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/providers/AuthProvider";
 import { useBand } from "@/providers/BandProvider";
+import { useLastProject } from "@/hooks/useLastProject";
 import { useProjects } from "@/hooks/useProjects";
 import { useTimeEntries } from "@/hooks/useTimeEntries";
 import { useMyOpenTasks } from "@/hooks/useTasks";
+import { startTimer } from "@/lib/data/timeEntries";
 import { dayRange, formatDateShort, weekRange } from "@/lib/dates";
 import { formatDuration, formatTimeOfDay } from "@/lib/time";
 import { timeEntryProjectName } from "@/lib/projectLabel";
 import { roleColorVar } from "@/lib/roleColors";
-import { TASK_PRIORITY_LABELS } from "@/types/models";
+import { TASK_PRIORITY_LABELS, type TimeEntry } from "@/types/models";
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { activeBandId, band, member } = useBand();
+  const { activeBandId, band, member, can } = useBand();
   const { projects, byId } = useProjects(activeBandId);
+  const { remember } = useLastProject(activeBandId);
+  const { toastError } = useToast();
+  const [restartingId, setRestartingId] = useState<string | null>(null);
 
   // Captured once on mount: the ranges must stay stable across renders or every
   // render would build a new query. The day rolls over on the next remount,
@@ -54,6 +60,25 @@ export default function DashboardPage() {
   const activeProjects = projects.filter((project) => project.status === "active").length;
   const greeting = getGreeting();
   const firstName = (member?.displayName ?? user?.displayName ?? "").split(" ")[0];
+
+  async function restartEntry(entry: TimeEntry) {
+    if (!user || !activeBandId || restartingId) return;
+    const description = entry.description.trim();
+    if (!description) return;
+    setRestartingId(entry.id);
+    try {
+      await startTimer(activeBandId, user.uid, {
+        projectId: entry.projectId,
+        taskId: entry.taskId,
+        description,
+      });
+      remember(entry.projectId);
+    } catch (err) {
+      toastError(err, "Der Timer konnte nicht gestartet werden.");
+    } finally {
+      setRestartingId(null);
+    }
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -206,8 +231,22 @@ export default function DashboardPage() {
                     {running ? (
                       <Badge tone="accent">läuft</Badge>
                     ) : (
-                      <span className="tabular shrink-0 font-mono text-sm">
-                        {formatDuration(entry.duration)}
+                      <span className="flex shrink-0 items-center gap-1">
+                        <span className="tabular font-mono text-sm">
+                          {formatDuration(entry.duration)}
+                        </span>
+                        {can.trackTime && entry.description.trim() ? (
+                          <button
+                            type="button"
+                            onClick={() => void restartEntry(entry)}
+                            disabled={restartingId !== null}
+                            aria-label={`Weitertracken: ${entry.description}`}
+                            title="Mit denselben Angaben weitertracken"
+                            className="text-faint hover:text-accent hover:bg-accent-soft rounded-sm p-1 disabled:opacity-50"
+                          >
+                            <Play className="size-3.5 fill-current" aria-hidden />
+                          </button>
+                        ) : null}
                       </span>
                     )}
                   </li>
