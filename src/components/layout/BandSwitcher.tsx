@@ -18,20 +18,37 @@ function BandOption({
   active: boolean;
   onSelect: () => void;
 }) {
-  const { data: band } = useDocument(bandDoc(bandId));
+  const { data: band, loading } = useDocument(bandDoc(bandId));
+  if (loading) {
+    return <div className="text-muted px-2 py-1.5 text-sm">…</div>;
+  }
+  // Missing docs are pruned from `bandIds` by BandProvider; do not let the
+  // user switch into a ghost row in the meantime.
+  if (!band) return null;
   return (
     <button
       type="button"
       onClick={onSelect}
       className="hover:bg-surface-2 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors"
     >
-      <span className="flex-1 truncate">{band?.name ?? "…"}</span>
+      <span className="flex-1 truncate">{band.name}</span>
       {active ? <Check className="text-accent size-3.5 shrink-0" aria-hidden /> : null}
     </button>
   );
 }
 
-export function BandSwitcher({ collapsed = false }: { collapsed?: boolean }) {
+export function BandSwitcher({
+  collapsed = false,
+  menuPlacement = "up",
+}: {
+  collapsed?: boolean;
+  /**
+   * Sidebar sits at the bottom of the column, so the menu opens up. The mobile
+   * "Mehr" sheet puts the switcher under the heading, so it must open down or
+   * the list is clipped behind the title.
+   */
+  menuPlacement?: "up" | "down";
+}) {
   const { band, bandIds, activeBandId, setActiveBandId } = useBand();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -80,7 +97,10 @@ export function BandSwitcher({ collapsed = false }: { collapsed?: boolean }) {
       {open ? (
         <div
           role="menu"
-          className="border-border bg-surface animate-fade-up absolute bottom-full left-0 z-50 mb-1 w-56 rounded-md border p-1 shadow-lg"
+          className={cn(
+            "border-border bg-surface animate-fade-up absolute left-0 z-50 w-56 rounded-md border p-1 shadow-lg",
+            menuPlacement === "up" ? "bottom-full mb-1" : "top-full mt-1",
+          )}
         >
           <p className="text-faint px-2 py-1 text-[11px] font-semibold tracking-wider uppercase">
             Bands

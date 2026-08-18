@@ -59,9 +59,15 @@ export function MobileNav() {
         </button>
       </nav>
 
-      <Dialog open={sheetOpen} onClose={() => setSheetOpen(false)} title="Mehr" size="sm">
+      <Dialog
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title="Mehr"
+        size="sm"
+        overflow="visible"
+      >
         <div className="flex flex-col gap-4">
-          <BandSwitcher />
+          <BandSwitcher menuPlacement="down" />
           <div className="flex flex-col gap-0.5">
             {rest.map(({ href, label, icon: Icon }) => (
               <Link

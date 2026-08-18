@@ -18,6 +18,7 @@ export function Dialog({
   children,
   footer,
   size = "md",
+  overflow = "auto",
 }: {
   open: boolean;
   onClose: () => void;
@@ -26,6 +27,11 @@ export function Dialog({
   children?: React.ReactNode;
   footer?: React.ReactNode;
   size?: "sm" | "md" | "lg";
+  /**
+   * `visible` lets a nested menu (band switcher in Mehr) escape the body.
+   * Default `auto` keeps long forms scrollable.
+   */
+  overflow?: "auto" | "visible";
 }) {
   const ref = useRef<HTMLDialogElement>(null);
 
@@ -63,7 +69,12 @@ export function Dialog({
       )}
     >
       {open ? (
-        <div className="flex max-h-[85vh] flex-col">
+        <div
+          className={cn(
+            "flex max-h-[85vh] flex-col",
+            overflow === "visible" && "overflow-visible",
+          )}
+        >
           <div className="border-border flex items-start gap-4 border-b px-5 py-4">
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <h2 id="dialog-title" className="text-base font-semibold">
@@ -81,7 +92,14 @@ export function Dialog({
               <X className="size-4" aria-hidden />
             </Button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+          <div
+            className={cn(
+              "min-h-0 flex-1 px-5 py-4",
+              overflow === "auto" ? "overflow-y-auto" : "overflow-visible",
+            )}
+          >
+            {children}
+          </div>
           {footer ? (
             <div className="border-border bg-surface-2/50 flex items-center justify-end gap-2 border-t px-5 py-3">
               {footer}
