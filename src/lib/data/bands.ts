@@ -175,10 +175,17 @@ export async function leaveBand(bandId: string, userId: string): Promise<void> {
   await removeBandFromUser(userId, bandId);
 }
 
-export async function deleteBand(bandId: string, inviteCode: string): Promise<void> {
+export async function deleteBand(
+  bandId: string,
+  userId: string,
+  inviteCode: string,
+): Promise<void> {
   // Subcollections are intentionally left in place: deleting them client-side
   // is not atomic and a half-deleted band is worse than an unreachable one.
-  // A real deployment would do this in a Cloud Function.
+  // A real deployment would do this in a Cloud Function. The deleter can only
+  // drop their own `bandIds` entry; other members' clients prune a missing
+  // band document on next load.
   if (inviteCode) await deleteDoc(inviteCodeDoc(inviteCode)).catch(() => {});
   await deleteDoc(bandDoc(bandId));
+  await removeBandFromUser(userId, bandId);
 }

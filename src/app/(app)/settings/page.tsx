@@ -9,12 +9,14 @@ import { ConfirmDialog } from "@/components/ui/Dialog";
 import { Input, Textarea } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
+import { useAuth } from "@/providers/AuthProvider";
 import { useBand } from "@/providers/BandProvider";
 import { InvitePanel } from "@/components/members/InvitePanel";
 import { deleteBand, updateBandSettings } from "@/lib/data/bands";
 import { centsToEuroInput, eurosToCents } from "@/lib/money";
 
 export default function SettingsPage() {
+  const { user } = useAuth();
   const { activeBandId, band, can, loading, setActiveBandId } = useBand();
   const { toast, toastError } = useToast();
   const router = useRouter();
@@ -84,10 +86,10 @@ export default function SettingsPage() {
   }
 
   async function onDelete() {
-    if (!activeBandId || !band) return;
+    if (!activeBandId || !band || !user) return;
     setBusy(true);
     try {
-      await deleteBand(activeBandId, band.inviteCode);
+      await deleteBand(activeBandId, user.uid, band.inviteCode);
       setActiveBandId(null);
       toast("Band gelöscht.", "info");
       router.replace("/bands");
