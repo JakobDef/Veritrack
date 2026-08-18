@@ -46,7 +46,10 @@ export function useCollection<T>(query: Query<T> | null): Async<T[]> {
     return onSnapshot(
       active,
       (snap) => setState({ data: snap.docs.map((doc) => doc.data()), loading: false, error: null }),
-      (error) => setState({ data: [], loading: false, error }),
+      (error) => {
+        console.error("Firestore listener failed:", error);
+        setState({ data: [], loading: false, error });
+      },
     );
   }, [active]);
 
@@ -74,7 +77,10 @@ export function useDocument<T>(ref: DocumentReference<T> | null): Async<T | null
     return onSnapshot(
       active,
       (snap) => setState({ data: snap.exists() ? snap.data() : null, loading: false, error: null }),
-      (error) => setState({ data: null, loading: false, error }),
+      (error) => {
+        console.error("Firestore listener failed:", error);
+        setState({ data: null, loading: false, error });
+      },
     );
   }, [active]);
 

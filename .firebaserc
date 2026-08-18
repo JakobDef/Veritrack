@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-veritrack"
+    "default": "veritrack-50e44",
+    "demo": "demo-veritrack"
   }
 }

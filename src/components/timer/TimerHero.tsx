@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { FolderPlus, Play, Square, Trash2 } from "lucide-react";
+import { Play, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
@@ -13,16 +12,17 @@ import { useProjects } from "@/hooks/useProjects";
 import { useLastProject } from "@/hooks/useLastProject";
 import { useRunningTimer } from "@/hooks/useRunningTimer";
 import { cancelTimer, startTimer, stopTimer } from "@/lib/data/timeEntries";
+import { timeEntryProjectName } from "@/lib/projectLabel";
 import { formatClock, formatDuration, formatTimeOfDay } from "@/lib/time";
 import { roleColorVar } from "@/lib/roleColors";
 import { cn } from "@/lib/cn";
 
 /**
- * The one thing this app is about: start tracking in a single click.
+ * The one thing this app is about: start tracking after typing a description.
  *
  * Design contract, do not erode it. Idle state shows the last used project
- * already selected and one prominent Start button. The description is optional
- * and stays editable while the timer runs, so nothing blocks the click.
+ * already selected (including "Kein Projekt") and autofocuses the description.
+ * Start is gated only on a trimmed description. Type, then Enter.
  */
 export function TimerHero() {
   const { user } = useAuth();
@@ -31,32 +31,39 @@ export function TimerHero() {
   const { lastProjectId, remember } = useLastProject(activeBandId);
   const { entry, elapsed, loading: timerLoading } = useRunningTimer(activeBandId, user?.uid ?? null);
   const { toastError, toast } = useToast();
-  const router = useRouter();
 
-  const [chosenProjectId, setChosenProjectId] = useState<string | null>(null);
+  /** `undefined` = picker untouched; `null` = user picked "Kein Projekt". */
+  const [chosenProjectId, setChosenProjectId] = useState<string | null | undefined>(undefined);
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
 
   const trackable = useMemo(() => projects.filter((p) => p.status !== "done"), [projects]);
 
   /**
-   * Derived, not stored in an effect. The selection falls back through: what the
-   * user just picked -> what they tracked last time -> the first active project.
-   * That fallback chain is what makes Start a single click on a normal day, and
-   * deriving it means the picker is never briefly empty on first paint.
+   * Derived, not stored in an effect. Explicit picker choice (including none)
+   * wins; else remembered project if still trackable; else remembered none;
+   * else first trackable; else null. First visit with no memory still
+   * preselects the first trackable project.
    */
-  const has = (id: string | null) => !!id && trackable.some((p) => p.id === id);
-  const selectedProjectId =
-    (has(chosenProjectId) ? chosenProjectId : null) ??
-    (has(lastProjectId) ? lastProjectId : null) ??
-    trackable[0]?.id ??
-    null;
+  const isTrackable = (id: string | null | undefined): id is string =>
+    typeof id === "string" && trackable.some((p) => p.id === id);
 
-  const runningProject = entry ? byId.get(entry.projectId) : null;
+  const selectedProjectId: string | null = (() => {
+    if (chosenProjectId !== undefined) {
+      if (chosenProjectId === null) return null;
+      if (isTrackable(chosenProjectId)) return chosenProjectId;
+    }
+    if (isTrackable(lastProjectId)) return lastProjectId;
+    if (lastProjectId === null) return null;
+    return trackable[0]?.id ?? null;
+  })();
+
+  const runningProject = entry?.projectId ? byId.get(entry.projectId) : undefined;
   const accent = runningProject ? roleColorVar(runningProject.color) : "var(--vt-accent)";
+  const canStart = description.trim().length > 0;
 
   async function onStart() {
-    if (!user || !activeBandId || !selectedProjectId) return;
+    if (!user || !activeBandId || !canStart) return;
     setBusy(true);
     try {
       await startTimer(activeBandId, user.uid, {
@@ -113,27 +120,6 @@ export function TimerHero() {
     );
   }
 
-  if (trackable.length === 0) {
-    return (
-      <section className="border-border bg-surface flex flex-col items-start gap-4 rounded-lg border p-6">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold">Erst ein Projekt, dann läuft die Uhr</h2>
-          <p className="text-muted text-sm">
-            {can.createProject
-              ? "Zeit wird immer auf ein Projekt gebucht. Leg eines an, danach reicht ein Klick."
-              : "Zeit wird immer auf ein Projekt gebucht. Bitte einen Admin, eines anzulegen."}
-          </p>
-        </div>
-        {can.createProject ? (
-          <Button variant="primary" size="lg" onClick={() => router.push("/projects?new=1")}>
-            <FolderPlus className="size-4" aria-hidden />
-            Projekt anlegen
-          </Button>
-        ) : null}
-      </section>
-    );
-  }
-
   const running = entry !== null;
 
   return (
@@ -182,7 +168,7 @@ export function TimerHero() {
                 {formatClock(elapsed)}
               </p>
               <p className="text-muted truncate text-sm">
-                {runningProject?.name ?? "Unbekanntes Projekt"}
+                {timeEntryProjectName(entry.projectId, runningProject)}
                 {entry.description ? ` · ${entry.description}` : ""}
               </p>
             </div>
@@ -210,7 +196,7 @@ export function TimerHero() {
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-semibold">Woran arbeitest du?</h2>
-            <p className="text-muted text-sm">Projekt wählen, Start drücken. Mehr nicht.</p>
+            <p className="text-muted text-sm">Beschreiben, Start drücken. Projekt ist optional.</p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -224,10 +210,12 @@ export function TimerHero() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && selectedProjectId) void onStart();
+                if (e.key === "Enter" && canStart) void onStart();
               }}
-              placeholder="Woran genau? (optional)"
-              aria-label="Beschreibung, optional"
+              autoFocus
+              required
+              placeholder="Woran arbeitest du?"
+              aria-label="Beschreibung"
               className="border-border bg-surface placeholder:text-faint hover:border-border-strong focus:border-accent focus:ring-accent/25 h-11 min-w-0 flex-1 rounded-md border px-3 text-sm transition-colors focus:ring-2 focus:outline-none"
             />
             <Button
@@ -235,7 +223,7 @@ export function TimerHero() {
               size="lg"
               onClick={() => void onStart()}
               loading={busy}
-              disabled={!selectedProjectId}
+              disabled={!canStart}
               className="sm:px-8"
             >
               <Play className="size-4 fill-current" aria-hidden />

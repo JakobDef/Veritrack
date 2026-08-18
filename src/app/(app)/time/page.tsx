@@ -19,8 +19,9 @@ import { useTimeEntries } from "@/hooks/useTimeEntries";
 import { deleteEntry } from "@/lib/data/timeEntries";
 import { formatMonthTitle, formatWeekTitle, monthRange, weekRange } from "@/lib/dates";
 import { formatDuration } from "@/lib/time";
+import { timeEntryProjectName } from "@/lib/projectLabel";
 import { canEditTimeEntry } from "@/lib/permissions";
-import type { TimeEntry } from "@/types/models";
+import { UNASSIGNED_PROJECT_KEY, UNASSIGNED_PROJECT_LABEL, type TimeEntry } from "@/types/models";
 import { cn } from "@/lib/cn";
 
 type Granularity = "week" | "month";
@@ -52,16 +53,19 @@ export default function TimePage() {
     [granularity, anchor],
   );
 
-  const { entries, loading } = useTimeEntries({
+  const { entries, loading, error } = useTimeEntries({
     bandId: activeBandId,
     userId: scope === "mine" ? user?.uid : undefined,
     range,
   });
 
-  const visible = useMemo(
-    () => (projectFilter === "all" ? entries : entries.filter((e) => e.projectId === projectFilter)),
-    [entries, projectFilter],
-  );
+  const visible = useMemo(() => {
+    if (projectFilter === "all") return entries;
+    if (projectFilter === UNASSIGNED_PROJECT_KEY) {
+      return entries.filter((e) => e.projectId === null);
+    }
+    return entries.filter((e) => e.projectId === projectFilter);
+  }, [entries, projectFilter]);
 
   const totalMinutes = visible.reduce((sum, entry) => sum + (entry.duration ?? 0), 0);
   const daysWithEntries = new Set(visible.map((e) => e.startTime.toDateString())).size;
@@ -167,6 +171,7 @@ export default function TimePage() {
           className="border-border bg-surface text-text h-8 rounded-md border px-2 text-xs"
         >
           <option value="all">Alle Projekte</option>
+          <option value={UNASSIGNED_PROJECT_KEY}>{UNASSIGNED_PROJECT_LABEL}</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>
               {project.name}
@@ -210,6 +215,12 @@ export default function TimePage() {
         <CardBody>
           {loading ? (
             <SkeletonList rows={4} />
+          ) : error ? (
+            <EmptyState
+              icon={Clock}
+              title="Zeiten konnten nicht geladen werden"
+              description="Versuch die Seite neu zu laden."
+            />
           ) : visible.length === 0 ? (
             <EmptyState
               icon={Clock}
@@ -271,7 +282,7 @@ export default function TimePage() {
         title="Eintrag löschen?"
         description={
           pendingDelete
-            ? `${formatDuration(pendingDelete.duration)} auf "${projectsById.get(pendingDelete.projectId)?.name ?? "Projekt"}" werden entfernt.`
+            ? `${formatDuration(pendingDelete.duration)} auf "${timeEntryProjectName(pendingDelete.projectId, pendingDelete.projectId ? projectsById.get(pendingDelete.projectId) : undefined)}" werden entfernt.`
             : ""
         }
       />

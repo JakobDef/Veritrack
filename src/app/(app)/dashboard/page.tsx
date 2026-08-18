@@ -17,6 +17,7 @@ import { useTimeEntries } from "@/hooks/useTimeEntries";
 import { useMyOpenTasks } from "@/hooks/useTasks";
 import { dayRange, formatDateShort, weekRange } from "@/lib/dates";
 import { formatDuration, formatTimeOfDay } from "@/lib/time";
+import { timeEntryProjectName } from "@/lib/projectLabel";
 import { roleColorVar } from "@/lib/roleColors";
 import { TASK_PRIORITY_LABELS } from "@/types/models";
 
@@ -179,7 +180,7 @@ export default function DashboardPage() {
           ) : (
             <ul className="flex flex-col">
               {recent.map((entry) => {
-                const project = byId.get(entry.projectId);
+                const project = entry.projectId ? byId.get(entry.projectId) : undefined;
                 const running = entry.endTime === null;
                 return (
                   <li
@@ -192,7 +193,7 @@ export default function DashboardPage() {
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">
-                        {project?.name ?? "Gelöschtes Projekt"}
+                        {timeEntryProjectName(entry.projectId, project)}
                         {entry.description ? (
                           <span className="text-muted"> · {entry.description}</span>
                         ) : null}

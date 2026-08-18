@@ -10,12 +10,13 @@ import {
   where,
 } from "firebase/firestore";
 import { timeEntriesCol, timeEntryDoc } from "@/lib/firebase/paths";
-import { toMinutes } from "@/lib/time";
+import { entryDescriptionError, entryRangeError, toMinutes } from "@/lib/time";
 
 export class TimeEntryError extends Error {}
 
 /**
- * Starts a timer for the given project.
+ * Starts a timer. Project is optional (`null` = unassigned); description is
+ * required (trimmed non-empty).
  *
  * Any timer already running for this user is stopped first. That is what makes
  * "switch to another project" a single click, and it is also the single-running-
@@ -27,9 +28,9 @@ export class TimeEntryError extends Error {}
 export async function startTimer(
   bandId: string,
   userId: string,
-  input: { projectId: string; taskId?: string | null; description?: string },
+  input: { projectId: string | null; taskId?: string | null; description: string },
 ): Promise<string> {
-  if (!input.projectId) throw new TimeEntryError("Bitte wähle zuerst ein Projekt.");
+  const description = requireDescription(input.description);
 
   await stopAllRunningTimers(bandId, userId);
 
@@ -37,7 +38,7 @@ export async function startTimer(
     userId,
     projectId: input.projectId,
     taskId: input.taskId ?? null,
-    description: input.description?.trim() ?? "",
+    description,
     // serverTimestamp() keeps every member's entries on one clock, so a device
     // with a skewed clock cannot shift the whole band's statistics.
     startTime: serverTimestamp(),
@@ -82,9 +83,9 @@ async function stopAllRunningTimers(bandId: string, userId: string): Promise<voi
 }
 
 export type ManualEntryInput = {
-  projectId: string;
+  projectId: string | null;
   taskId?: string | null;
-  description?: string;
+  description: string;
   startTime: Date;
   endTime: Date;
 };
@@ -96,11 +97,12 @@ export async function createManualEntry(
   input: ManualEntryInput,
 ): Promise<string> {
   validateRange(input.startTime, input.endTime);
+  const description = requireDescription(input.description);
   const ref = await addDoc(timeEntriesCol(bandId).withConverter(null), {
     userId,
     projectId: input.projectId,
     taskId: input.taskId ?? null,
-    description: input.description?.trim() ?? "",
+    description,
     startTime: input.startTime,
     endTime: input.endTime,
     duration: toMinutes(input.startTime, input.endTime),
@@ -117,7 +119,9 @@ export async function updateEntry(
   const payload: Record<string, unknown> = {};
   if (input.projectId !== undefined) payload.projectId = input.projectId;
   if (input.taskId !== undefined) payload.taskId = input.taskId;
-  if (input.description !== undefined) payload.description = input.description.trim();
+  if (input.description !== undefined) {
+    payload.description = requireDescription(input.description);
+  }
 
   if (input.startTime && input.endTime) {
     validateRange(input.startTime, input.endTime);
@@ -135,13 +139,12 @@ export async function deleteEntry(bandId: string, entryId: string): Promise<void
 }
 
 function validateRange(startTime: Date, endTime: Date): void {
-  if (endTime.getTime() <= startTime.getTime()) {
-    throw new TimeEntryError("Das Ende muss nach dem Start liegen.");
-  }
-  if (startTime.getTime() > Date.now() + 60_000) {
-    throw new TimeEntryError("Ein Eintrag kann nicht in der Zukunft beginnen.");
-  }
-  if (endTime.getTime() - startTime.getTime() > 24 * 60 * 60 * 1000) {
-    throw new TimeEntryError("Ein einzelner Eintrag kann höchstens 24 Stunden lang sein.");
-  }
+  const message = entryRangeError(startTime, endTime);
+  if (message) throw new TimeEntryError(message);
+}
+
+function requireDescription(description: string): string {
+  const message = entryDescriptionError(description);
+  if (message) throw new TimeEntryError(message);
+  return description.trim();
 }

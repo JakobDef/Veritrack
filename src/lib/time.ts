@@ -66,8 +66,75 @@ export function toDateTimeLocalValue(date: Date): string {
   );
 }
 
+/**
+ * Parse a `yyyy-MM-ddTHH:mm` (optional seconds) string as LOCAL time.
+ *
+ * `new Date("2026-08-14T07:00")` is not safe: some engines treat a missing
+ * offset as UTC, others as local, Safari used to reject it without seconds.
+ * Clock fields from `<input type="date">` / `<input type="time">` are local
+ * wall time, so the Date must be built from components.
+ */
 export function fromDateTimeLocalValue(value: string): Date | null {
   if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(
+    value.trim(),
+  );
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hours = Number(match[4]);
+  const minutes = Number(match[5]);
+  const seconds = match[6] != null ? Number(match[6]) : 0;
+  const ms = match[7] != null ? Number(match[7].padEnd(3, "0")) : 0;
+  const date = new Date(year, month - 1, day, hours, minutes, seconds, ms);
+  if (Number.isNaN(date.getTime())) return null;
+  // JS Date overflows 31 Feb into March. A form value must mean that calendar day.
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day ||
+    date.getHours() !== hours ||
+    date.getMinutes() !== minutes
+  ) {
+    return null;
+  }
+  return date;
+}
+
+/** Combines a `yyyy-MM-dd` date and an `HH:mm` (optional seconds) time as local. */
+export function combineLocalDateTime(date: string, time: string): Date | null {
+  if (!date || !time) return null;
+  return fromDateTimeLocalValue(`${date}T${time}`);
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * User-facing checks for a manual / edited time entry. Shared by the form
+ * (inline) and the write path (throws). `now` is injectable so tests do not
+ * depend on the wall clock.
+ */
+export function entryRangeError(start: Date, end: Date, now: Date = new Date()): string | null {
+  if (end.getTime() <= start.getTime()) {
+    return "Das Ende muss nach dem Start liegen.";
+  }
+  if (start.getTime() > now.getTime() + 60_000) {
+    return "Ein Eintrag kann nicht in der Zukunft beginnen.";
+  }
+  if (end.getTime() - start.getTime() > MS_PER_DAY) {
+    return "Ein einzelner Eintrag kann höchstens 24 Stunden lang sein.";
+  }
+  return null;
+}
+
+/**
+ * Shared by the timer, the manual form (inline), and the write path (throws).
+ * Whitespace-only is empty: a description must say what the work was.
+ */
+export function entryDescriptionError(description: string): string | null {
+  if (description.trim().length === 0) {
+    return "Bitte beschreibe, woran du arbeitest.";
+  }
+  return null;
 }

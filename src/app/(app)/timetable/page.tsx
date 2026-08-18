@@ -13,8 +13,13 @@ import { useProjects } from "@/hooks/useProjects";
 import { useTimeEntries } from "@/hooks/useTimeEntries";
 import { formatMonthTitle, formatWeekTitle, monthRange, weekRange } from "@/lib/dates";
 import { formatDuration, formatTimeOfDay } from "@/lib/time";
+import { timeEntryProjectName } from "@/lib/projectLabel";
 import { roleColorVar } from "@/lib/roleColors";
 import { cn } from "@/lib/cn";
+import {
+  UNASSIGNED_PROJECT_KEY,
+  UNASSIGNED_PROJECT_LABEL,
+} from "@/types/models";
 
 type View = "week" | "month";
 
@@ -53,19 +58,23 @@ export default function TimetablePage() {
     return entries
       .filter((entry) => {
         if (memberFilter !== "all" && entry.userId !== memberFilter) return false;
-        if (projectFilter !== "all" && entry.projectId !== projectFilter) return false;
+        if (projectFilter === UNASSIGNED_PROJECT_KEY) {
+          if (entry.projectId !== null) return false;
+        } else if (projectFilter !== "all" && entry.projectId !== projectFilter) {
+          return false;
+        }
         if (roleFilter !== "all" && membersById.get(entry.userId)?.role !== roleFilter) return false;
         return true;
       })
       .map((entry) => {
         const member = membersById.get(entry.userId);
-        const project = projectsById.get(entry.projectId);
+        const project = entry.projectId ? projectsById.get(entry.projectId) : undefined;
         return {
           entry,
           color:
             colorMode === "member" ? roleColorVar(member?.roleColor) : roleColorVar(project?.color),
           memberName: member?.displayName ?? "Unbekannt",
-          projectName: project?.name ?? "Gelöschtes Projekt",
+          projectName: timeEntryProjectName(entry.projectId, project),
         };
       });
   }, [entries, memberFilter, projectFilter, roleFilter, membersById, projectsById, colorMode]);
@@ -76,8 +85,20 @@ export default function TimetablePage() {
     if (colorMode === "member") {
       return members.map((m) => ({ id: m.id, label: m.displayName, color: roleColorVar(m.roleColor) }));
     }
-    return projects.map((p) => ({ id: p.id, label: p.name, color: roleColorVar(p.color) }));
-  }, [colorMode, members, projects]);
+    const items = projects.map((p) => ({
+      id: p.id,
+      label: p.name,
+      color: roleColorVar(p.color),
+    }));
+    if (decorated.some((d) => d.entry.projectId === null)) {
+      items.push({
+        id: UNASSIGNED_PROJECT_KEY,
+        label: UNASSIGNED_PROJECT_LABEL,
+        color: "var(--vt-faint)",
+      });
+    }
+    return items;
+  }, [colorMode, members, projects, decorated]);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
@@ -167,6 +188,7 @@ export default function TimetablePage() {
             className="border-border bg-surface text-text h-8 rounded-md border px-2 text-xs"
           >
             <option value="all">Alle Projekte</option>
+            <option value={UNASSIGNED_PROJECT_KEY}>{UNASSIGNED_PROJECT_LABEL}</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}

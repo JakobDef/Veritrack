@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, CalendarClock, Pencil, Play, Timer, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { ConfirmDialog } from "@/components/ui/Dialog";
+import { ConfirmDialog, Dialog } from "@/components/ui/Dialog";
+import { Input } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
@@ -22,7 +23,7 @@ import { projectDoc } from "@/lib/firebase/paths";
 import { deleteProject } from "@/lib/data/projects";
 import { startTimer } from "@/lib/data/timeEntries";
 import { formatDateShort } from "@/lib/dates";
-import { formatDuration } from "@/lib/time";
+import { formatDuration, entryDescriptionError } from "@/lib/time";
 import { roleColorVar } from "@/lib/roleColors";
 import { PROJECT_STATUS_LABELS, type Task, type TaskStatus } from "@/types/models";
 
@@ -47,6 +48,8 @@ export default function ProjectDetailPage({
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [startOpen, setStartOpen] = useState(false);
+  const [startDescription, setStartDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [taskDialog, setTaskDialog] = useState<{ task: Task | null; status: TaskStatus } | null>(
     null,
@@ -85,12 +88,19 @@ export default function ProjectDetailPage({
 
   const color = roleColorVar(project.color);
 
+  const startError = entryDescriptionError(startDescription);
+
   async function onStart() {
-    if (!user || !activeBandId) return;
+    if (!user || !activeBandId || startError) return;
     setBusy(true);
     try {
-      await startTimer(activeBandId, user.uid, { projectId });
-      toast(`Timer läuft: ${project!.name}`, "success");
+      await startTimer(activeBandId, user.uid, {
+        projectId,
+        description: startDescription,
+      });
+      toast(`Timer läuft: ${startDescription.trim()}`, "success");
+      setStartOpen(false);
+      setStartDescription("");
     } catch (err) {
       toastError(err, "Der Timer konnte nicht gestartet werden.");
     } finally {
@@ -153,7 +163,14 @@ export default function ProjectDetailPage({
 
           <div className="flex shrink-0 items-center gap-2">
             {can.trackTime ? (
-              <Button variant="primary" onClick={() => void onStart()} loading={busy}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setStartDescription("");
+                  setStartOpen(true);
+                }}
+                disabled={busy}
+              >
                 <Play className="size-4 fill-current" aria-hidden />
                 Timer starten
               </Button>
@@ -222,6 +239,60 @@ export default function ProjectDetailPage({
           canEdit={can.editTask}
         />
       ) : null}
+
+      <Dialog
+        open={startOpen}
+        onClose={() => {
+          if (busy) return;
+          setStartOpen(false);
+          setStartDescription("");
+        }}
+        title="Timer starten"
+        description="Beschreibe kurz, woran du arbeitest."
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (busy) return;
+                setStartOpen(false);
+                setStartDescription("");
+              }}
+              disabled={busy}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              form="project-start-timer-form"
+              loading={busy}
+              disabled={!!startError}
+            >
+              Start
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="project-start-timer-form"
+          className="flex flex-col gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void onStart();
+          }}
+        >
+          <Input
+            label="Beschreibung"
+            required
+            autoFocus
+            value={startDescription}
+            onChange={(e) => setStartDescription(e.target.value)}
+            placeholder="Woran arbeitest du?"
+          />
+        </form>
+      </Dialog>
 
       <ConfirmDialog
         open={deleteOpen}

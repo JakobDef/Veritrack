@@ -8,10 +8,17 @@ import { Input, Textarea } from "@/components/ui/Input";
 import { Field } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
 import { ProjectPicker } from "@/components/timer/ProjectPicker";
+import { useLastProject } from "@/hooks/useLastProject";
 import { createManualEntry, updateEntry } from "@/lib/data/timeEntries";
 import { formatDateInput } from "@/lib/dates";
-import { formatDuration, toMinutes } from "@/lib/time";
-import type { Project, TimeEntry } from "@/types/models";
+import {
+  combineLocalDateTime,
+  entryDescriptionError,
+  entryRangeError,
+  formatDuration,
+  toMinutes,
+} from "@/lib/time";
+import { UNASSIGNED_PROJECT_KEY, type Project, type TimeEntry } from "@/types/models";
 
 type Draft = {
   projectId: string | null;
@@ -25,7 +32,45 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-function draftFrom(entry: TimeEntry | null, projects: Project[]): Draft {
+function defaultTimes(now: Date): Pick<Draft, "date" | "start" | "end"> {
+  const end = new Date(now);
+  end.setSeconds(0, 0);
+  const start = new Date(end.getTime() - 2 * 60 * 60 * 1000);
+  // A window that crossed midnight would put "Von" later on today's clock than
+  // "Bis", which the midnight-roll would then push into tomorrow. Clamp to
+  // today's start instead so a new entry is always a valid past range.
+  if (
+    start.getDate() !== end.getDate() ||
+    start.getMonth() !== end.getMonth() ||
+    start.getFullYear() !== end.getFullYear()
+  ) {
+    start.setTime(end.getTime());
+    start.setHours(0, 0, 0, 0);
+  }
+  return {
+    date: formatDateInput(end),
+    start: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
+    end: `${pad(end.getHours())}:${pad(end.getMinutes())}`,
+  };
+}
+
+function defaultNewProjectId(
+  projects: Project[],
+  lastProjectId: string | null | undefined,
+): string | null {
+  const trackable = projects.filter((p) => p.status !== "done");
+  if (typeof lastProjectId === "string" && trackable.some((p) => p.id === lastProjectId)) {
+    return lastProjectId;
+  }
+  if (lastProjectId === null) return null;
+  return trackable[0]?.id ?? null;
+}
+
+function draftFrom(
+  entry: TimeEntry | null,
+  projects: Project[],
+  lastProjectId: string | null | undefined,
+): Draft {
   if (entry) {
     return {
       projectId: entry.projectId,
@@ -37,21 +82,14 @@ function draftFrom(entry: TimeEntry | null, projects: Project[]): Draft {
       description: entry.description,
     };
   }
-  const now = new Date();
+  const times = defaultTimes(new Date());
   return {
-    projectId: projects[0]?.id ?? null,
-    date: formatDateInput(now),
-    start: "19:00",
-    end: "21:00",
+    projectId: defaultNewProjectId(projects, lastProjectId),
+    date: times.date,
+    start: times.start,
+    end: times.end,
     description: "",
   };
-}
-
-/** Combines a `yyyy-MM-dd` and a `HH:mm` into a local Date. */
-function combine(date: string, time: string): Date | null {
-  if (!date || !time) return null;
-  const parsed = new Date(`${date}T${time}`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 export function ManualEntryForm({
@@ -73,19 +111,24 @@ export function ManualEntryForm({
   /** The user's other entries, used for the overlap check. */
   existingEntries: TimeEntry[];
 }) {
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(entry, projects));
+  const { lastProjectId } = useLastProject(bandId);
+  const [draft, setDraft] = useState<Draft>(() => draftFrom(entry, projects, lastProjectId));
   const [busy, setBusy] = useState(false);
   const { toast, toastError } = useToast();
 
   const [seededFor, setSeededFor] = useState<string | null>(null);
-  const seedKey = open ? (entry?.id ?? "new") : null;
+  const seedKey = open
+    ? entry
+      ? entry.id
+      : `new:${lastProjectId === undefined ? "" : lastProjectId === null ? UNASSIGNED_PROJECT_KEY : lastProjectId}`
+    : null;
   if (seedKey !== seededFor) {
     setSeededFor(seedKey);
-    if (seedKey) setDraft(draftFrom(entry, projects));
+    if (seedKey) setDraft(draftFrom(entry, projects, lastProjectId));
   }
 
-  const startAt = combine(draft.date, draft.start);
-  let endAt = combine(draft.date, draft.end);
+  const startAt = combineLocalDateTime(draft.date, draft.start);
+  let endAt = combineLocalDateTime(draft.date, draft.end);
   // A gig from 22:00 to 01:00 is one entry that runs past midnight, not a
   // negative duration. Roll the end into the next day when it PRECEDES the
   // start; a strict comparison matters, because rolling over on equality would
@@ -117,19 +160,22 @@ export function ManualEntryForm({
         })
       : undefined;
 
-  const error = !draft.projectId
-    ? "Bitte wähle ein Projekt."
-    : !startAt || !endAt
-      ? "Bitte gib Start und Ende an."
-      : minutes === 0
-        ? "Start und Ende dürfen nicht identisch sein."
+  const rangeError = startAt && endAt ? entryRangeError(startAt, endAt) : null;
+  const descriptionError = entryDescriptionError(draft.description);
+
+  const error = !startAt || !endAt
+    ? "Bitte gib Start und Ende an."
+    : rangeError
+      ? rangeError
+      : descriptionError
+        ? descriptionError
         : overlap
           ? "In diesem Zeitraum ist bereits ein Eintrag erfasst."
           : null;
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (error || !draft.projectId || !startAt || !endAt) return;
+    if (error || !startAt || !endAt) return;
     setBusy(true);
     try {
       if (entry) {
@@ -222,7 +268,7 @@ export function ManualEntryForm({
 
         <Textarea
           label="Beschreibung"
-          hint="Optional."
+          required
           value={draft.description}
           onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
           placeholder="Probe im Proberaum"

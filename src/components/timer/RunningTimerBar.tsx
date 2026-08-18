@@ -10,6 +10,7 @@ import { useBand } from "@/providers/BandProvider";
 import { useProjects } from "@/hooks/useProjects";
 import { useRunningTimer } from "@/hooks/useRunningTimer";
 import { stopTimer } from "@/lib/data/timeEntries";
+import { timeEntryProjectName } from "@/lib/projectLabel";
 import { formatClock, formatDuration } from "@/lib/time";
 import { roleColorVar } from "@/lib/roleColors";
 
@@ -29,7 +30,7 @@ export function RunningTimerBar() {
 
   if (!entry || pathname === "/dashboard") return null;
 
-  const project = byId.get(entry.projectId);
+  const project = entry.projectId ? byId.get(entry.projectId) : undefined;
   const accent = project ? roleColorVar(project.color) : "var(--vt-accent)";
 
   async function onStop() {
@@ -58,7 +59,7 @@ export function RunningTimerBar() {
         {formatClock(elapsed)}
       </span>
       <span className="text-muted min-w-0 flex-1 truncate text-sm">
-        {project?.name ?? "Projekt"}
+        {timeEntryProjectName(entry.projectId, project)}
         {entry.description ? <span className="text-faint"> · {entry.description}</span> : null}
       </span>
       <Button size="sm" variant="secondary" onClick={() => void onStop()} loading={busy}>

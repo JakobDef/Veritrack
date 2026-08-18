@@ -32,6 +32,7 @@ function ProjectsView() {
   const minutesByProject = useMemo(() => {
     const totals = new Map<string, number>();
     for (const entry of entries) {
+      if (entry.projectId == null) continue;
       totals.set(entry.projectId, (totals.get(entry.projectId) ?? 0) + (entry.duration ?? 0));
     }
     return totals;

@@ -1,5 +1,12 @@
 import { dayKey } from "./dates";
-import type { BandMember, Project, Task, TimeEntry } from "@/types/models";
+import {
+  UNASSIGNED_PROJECT_KEY,
+  UNASSIGNED_PROJECT_LABEL,
+  type BandMember,
+  type Project,
+  type Task,
+  type TimeEntry,
+} from "@/types/models";
 
 /**
  * Pure aggregation over plain arrays. Nothing here touches Firestore, React or
@@ -58,7 +65,8 @@ export function totalsByProject(
 ): Slice[] {
   const totals = new Map<string, number>();
   for (const entry of entries) {
-    totals.set(entry.projectId, (totals.get(entry.projectId) ?? 0) + minutesOf(entry));
+    const id = entry.projectId ?? UNASSIGNED_PROJECT_KEY;
+    totals.set(id, (totals.get(id) ?? 0) + minutesOf(entry));
   }
   const slices = projects
     .map((project) => ({
@@ -69,11 +77,22 @@ export function totalsByProject(
     }))
     .filter((slice) => slice.minutes > 0);
 
+  const unassigned = totals.get(UNASSIGNED_PROJECT_KEY) ?? 0;
+  if (unassigned > 0) {
+    slices.push({
+      id: UNASSIGNED_PROJECT_KEY,
+      label: UNASSIGNED_PROJECT_LABEL,
+      color: "var(--vt-muted)",
+      minutes: unassigned,
+    });
+  }
+
   // Time booked on a since-deleted project would otherwise silently vanish from
-  // the totals, making the pie disagree with the headline number.
+  // the totals, making the pie disagree with the headline number. Unassigned is
+  // a real bucket, not an orphan.
   const known = new Set(projects.map((p) => p.id));
   const orphaned = [...totals.entries()]
-    .filter(([id]) => !known.has(id))
+    .filter(([id]) => id !== UNASSIGNED_PROJECT_KEY && !known.has(id))
     .reduce((sum, [, minutes]) => sum + minutes, 0);
   if (orphaned > 0) {
     slices.push({

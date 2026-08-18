@@ -6,6 +6,9 @@ import {
   formatHours,
   fromDateTimeLocalValue,
   toDateTimeLocalValue,
+  combineLocalDateTime,
+  entryRangeError,
+  entryDescriptionError,
   toMinutes,
 } from "@/lib/time";
 
@@ -108,8 +111,80 @@ describe("datetime-local round trip", () => {
     expect(toDateTimeLocalValue(new Date(2026, 0, 3, 4, 7))).toBe("2026-01-03T04:07");
   });
 
+  it("reads clock fields as local wall time, not UTC", () => {
+    const morning = fromDateTimeLocalValue("2026-08-14T07:00");
+    expect(morning?.getFullYear()).toBe(2026);
+    expect(morning?.getMonth()).toBe(7);
+    expect(morning?.getDate()).toBe(14);
+    expect(morning?.getHours()).toBe(7);
+    expect(morning?.getMinutes()).toBe(0);
+  });
+
+  it("accepts seconds from <input type=time>", () => {
+    const withSeconds = fromDateTimeLocalValue("2026-08-14T07:00:00");
+    expect(withSeconds?.getHours()).toBe(7);
+    expect(withSeconds?.getSeconds()).toBe(0);
+  });
+
   it("rejects unparseable input", () => {
     expect(fromDateTimeLocalValue("")).toBeNull();
     expect(fromDateTimeLocalValue("nonsense")).toBeNull();
+    expect(fromDateTimeLocalValue("2026-02-31T10:00")).toBeNull();
+  });
+
+  it("combines a date input and a time input as local", () => {
+    const combined = combineLocalDateTime("2026-08-14", "09:00");
+    expect(combined?.getHours()).toBe(9);
+    expect(combined?.getDate()).toBe(14);
+    expect(combineLocalDateTime("", "09:00")).toBeNull();
+    expect(combineLocalDateTime("2026-08-14", "")).toBeNull();
+  });
+});
+
+describe("entryRangeError", () => {
+  const now = new Date(2026, 7, 14, 11, 45);
+
+  it("allows a range earlier the same morning", () => {
+    const start = new Date(2026, 7, 14, 7, 0);
+    const end = new Date(2026, 7, 14, 9, 0);
+    expect(entryRangeError(start, end, now)).toBeNull();
+  });
+
+  it("rejects a start later today", () => {
+    const start = new Date(2026, 7, 14, 19, 0);
+    const end = new Date(2026, 7, 14, 21, 0);
+    expect(entryRangeError(start, end, now)).toBe("Ein Eintrag kann nicht in der Zukunft beginnen.");
+  });
+
+  it("allows a start up to one minute ahead of now", () => {
+    const start = new Date(now.getTime() + 30_000);
+    const end = new Date(now.getTime() + 30 * 60_000);
+    expect(entryRangeError(start, end, now)).toBeNull();
+  });
+
+  it("rejects a zero-length range", () => {
+    const t = new Date(2026, 7, 14, 7, 0);
+    expect(entryRangeError(t, t, now)).toBe("Das Ende muss nach dem Start liegen.");
+  });
+
+  it("rejects a range longer than 24 hours", () => {
+    const start = new Date(2026, 7, 13, 8, 0);
+    const end = new Date(2026, 7, 14, 8, 1);
+    expect(entryRangeError(start, end, now)).toBe(
+      "Ein einzelner Eintrag kann höchstens 24 Stunden lang sein.",
+    );
+  });
+});
+
+describe("entryDescriptionError", () => {
+  it("rejects empty and whitespace-only text", () => {
+    expect(entryDescriptionError("")).toBe("Bitte beschreibe, woran du arbeitest.");
+    expect(entryDescriptionError("   ")).toBe("Bitte beschreibe, woran du arbeitest.");
+    expect(entryDescriptionError("\n\t")).toBe("Bitte beschreibe, woran du arbeitest.");
+  });
+
+  it("accepts real text", () => {
+    expect(entryDescriptionError("Soundcheck")).toBeNull();
+    expect(entryDescriptionError("  Soundcheck  ")).toBeNull();
   });
 });

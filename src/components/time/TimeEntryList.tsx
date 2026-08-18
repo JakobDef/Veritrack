@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { bucketByLocalDay, formatDayLabel } from "@/lib/dates";
 import { formatDuration, formatTimeOfDay } from "@/lib/time";
+import { timeEntryProjectName } from "@/lib/projectLabel";
 import { roleColorVar } from "@/lib/roleColors";
 import type { BandMember, Project, TimeEntry } from "@/types/models";
 
@@ -55,7 +56,7 @@ export function TimeEntryList({
 
           <ul>
             {day.items.map((entry) => {
-              const project = projectsById.get(entry.projectId);
+              const project = entry.projectId ? projectsById.get(entry.projectId) : undefined;
               const owner = membersById?.get(entry.userId);
               const running = entry.endTime === null;
               const editable = canEdit(entry);
@@ -80,7 +81,7 @@ export function TimeEntryList({
 
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">
-                      {project?.name ?? "Gelöschtes Projekt"}
+                      {timeEntryProjectName(entry.projectId, project)}
                     </p>
                     <p className="text-muted truncate text-xs">
                       {formatTimeOfDay(entry.startTime)}

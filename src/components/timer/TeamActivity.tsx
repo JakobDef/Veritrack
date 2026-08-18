@@ -9,6 +9,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useBand } from "@/providers/BandProvider";
 import { useProjects } from "@/hooks/useProjects";
 import { useTeamRunningTimers } from "@/hooks/useRunningTimer";
+import { timeEntryProjectName } from "@/lib/projectLabel";
 import { formatClock } from "@/lib/time";
 import { roleColorVar } from "@/lib/roleColors";
 
@@ -43,7 +44,7 @@ export function TeamActivity() {
     <ul className="flex flex-col gap-1">
       {others.map(({ entry, elapsed }) => {
         const member = memberById.get(entry.userId);
-        const project = byId.get(entry.projectId);
+        const project = entry.projectId ? byId.get(entry.projectId) : undefined;
         const color = roleColorVar(member?.roleColor);
         return (
           <li
@@ -58,7 +59,9 @@ export function TeamActivity() {
             />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{member?.displayName ?? "Unbekannt"}</p>
-              <p className="text-muted truncate text-xs">{project?.name ?? "Projekt"}</p>
+              <p className="text-muted truncate text-xs">
+                {timeEntryProjectName(entry.projectId, project)}
+              </p>
             </div>
             <span className="flex shrink-0 items-center gap-1.5">
               <span

@@ -95,7 +95,8 @@ export type Task = {
 export type TimeEntry = {
   id: string;
   userId: string;
-  projectId: string;
+  /** `null` when the entry is not assigned to a project. */
+  projectId: string | null;
   taskId: string | null;
   description: string;
   startTime: Date;
@@ -105,6 +106,18 @@ export type TimeEntry = {
   duration: number | null;
   createdAt: Date;
 };
+
+/** Lists, stats, and filters: an entry with `projectId === null`. */
+export const UNASSIGNED_PROJECT_LABEL = "Ohne Projekt";
+
+/** Project picker idle option. Distinct from the list/stats label. */
+export const UNASSIGNED_PROJECT_PICKER_LABEL = "Kein Projekt";
+
+/** Leftover id whose project document was deleted. */
+export const DELETED_PROJECT_LABEL = "Gelöschtes Projekt";
+
+/** localStorage / filter / stats bucket key for unassigned entries. Not a Firestore id. */
+export const UNASSIGNED_PROJECT_KEY = "__unassigned__";
 
 /** Lookup document that lets a signed-out-of-the-band user resolve a code. */
 export type InviteCode = {

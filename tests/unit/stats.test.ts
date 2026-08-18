@@ -12,7 +12,7 @@ import type { TimeEntry } from "@/types/models";
 
 const color = (key: string) => (key ? `var(--vt-${key})` : "var(--vt-faint)");
 
-function entry(partial: Partial<TimeEntry> & { userId: string; projectId: string }): TimeEntry {
+function entry(partial: Partial<TimeEntry> & { userId: string; projectId: string | null }): TimeEntry {
   return {
     id: Math.random().toString(36).slice(2),
     taskId: null,
@@ -110,6 +110,34 @@ describe("totalsByProject", () => {
     expect(result).toHaveLength(1);
     expect(result[0]!.label).toBe("Gelöschte Projekte");
     expect(result[0]!.minutes).toBe(90);
+  });
+
+  it("buckets unassigned time as Ohne Projekt", () => {
+    const result = totalsByProject(
+      [entry({ userId: "u1", projectId: null, duration: 40 })],
+      projects,
+      color,
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0]!.id).toBe("__unassigned__");
+    expect(result[0]!.label).toBe("Ohne Projekt");
+    expect(result[0]!.color).toBe("var(--vt-muted)");
+    expect(result[0]!.minutes).toBe(40);
+  });
+
+  it("keeps unassigned and deleted-orphan slices distinct", () => {
+    const result = totalsByProject(
+      [
+        entry({ userId: "u1", projectId: null, duration: 30 }),
+        entry({ userId: "u1", projectId: "gone", duration: 90 }),
+      ],
+      projects,
+      color,
+    );
+    expect(result.map((s) => [s.label, s.minutes])).toEqual([
+      ["Gelöschte Projekte", 90],
+      ["Ohne Projekt", 30],
+    ]);
   });
 });
 

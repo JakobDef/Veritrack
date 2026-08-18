@@ -13,9 +13,13 @@ import type { DateRange } from "@/lib/dates";
  * by when it STARTED. Combined with the local-day bucketing in `dates.ts` that
  * keeps the list, the per-day totals and the calendar in agreement.
  *
- * Every combination used here is declared in firestore.indexes.json. The
- * emulator does not enforce indexes, so a missing declaration only ever fails
- * against a real project.
+ * Ranged queries filter only on `startTime` and apply `userId` in memory.
+ * Combining both in Firestore needs a composite index; when that query
+ * failed, the Zeiten page showed an empty period with no error. Un-ranged
+ * `userId` queries (dashboard last-six) still go to Firestore so `limit()`
+ * applies to that user. That combination is declared in firestore.indexes.json.
+ * The emulator does not enforce indexes, so a missing declaration only ever
+ * fails against a real project.
  *
  * Known limit: callers that compute an all-time total (per project, per member)
  * pass neither `range` nor `max`, so they subscribe to the band's whole
@@ -45,20 +49,31 @@ export function useTimeEntries({
   const q = useMemo(() => {
     if (!bandId) return null;
     const constraints = [];
-    if (userId) constraints.push(where("userId", "==", userId));
+    const ranged = fromMs !== undefined && toMs !== undefined;
+
+    // Keep the Firestore `userId` clause only for un-ranged queries like the
+    // dashboard's last-six, where a `limit()` would otherwise pick the whole
+    // band's newest entries. Owner filtering for a date range happens below.
+    if (userId && !ranged) constraints.push(where("userId", "==", userId));
     if (fromMs !== undefined && toMs !== undefined) {
       constraints.push(where("startTime", ">=", new Date(fromMs)));
       constraints.push(where("startTime", "<=", new Date(toMs)));
     }
+    constraints.push(orderBy("startTime", "desc"));
     // `max` is a real `limit()`, not a client-side slice. Without it the
     // dashboard's "last six entries" would open a live listener over the user's
     // entire history and throw almost all of it away, and that cost grows with
     // every entry the band ever records.
     if (max) constraints.push(limit(max));
-    return query(timeEntriesCol(bandId), ...constraints, orderBy("startTime", "desc"));
+    return query(timeEntriesCol(bandId), ...constraints);
   }, [bandId, userId, fromMs, toMs, max]);
 
-  const { data: entries, loading, error } = useCollection(q);
+  const { data, loading, error } = useCollection(q);
+
+  const entries = useMemo(
+    () => (userId ? data.filter((entry) => entry.userId === userId) : data),
+    [data, userId],
+  );
 
   const totalMinutes = useMemo(
     () => entries.reduce((sum, entry) => sum + (entry.duration ?? 0), 0),

@@ -124,7 +124,7 @@ This rule applies to any agent that edits `.claude/agents/` (including the learn
 
 ## Project-specific section
 
-Veritrack is a band collaboration web app: members and roles, one-click time tracking, projects, a Kanban board, a shared timetable and statistics. The dashboard timer is the product's centre of gravity, not one feature among many; a change that adds friction to starting a timer is a regression.
+Veritrack is a band collaboration web app: members and roles, time tracking from the dashboard timer, projects, a Kanban board, a shared timetable and statistics. The dashboard timer is the product's centre of gravity, not one feature among many; a change that adds friction to starting a timer is a regression.
 
 ### Stack
 
@@ -181,7 +181,8 @@ See `.docs/rules/verification.md` for the commands and the order to run them. Sh
 - **The two role concepts never merge.** `role` is functional and cosmetic ("Gitarre"); `permissionRole` is `admin | member | viewer` and is the only thing that grants rights. Separate fields, separate UI controls, separate update functions in `src/lib/data/members.ts`.
 - **Memoize every Firestore query** before it reaches `useCollection`. It compares with `queryEqual`, but an unmemoized inline query still churns the memo on every render.
 - **No raw hex or Tailwind palette colors in components.** Add a token to `globals.css` instead. The `role-1..8` slot order is validated for colour-vision separation between neighbouring slots, so re-run the palette validator before reordering or restyling it.
-- **Dates are local-time throughout.** Firestore Timestamps are UTC instants; the calendar and every per-day total bucket by the viewer's local day via `src/lib/dates.ts`. An entry crossing midnight belongs entirely to its start day.
+- **Dates are local-time throughout.** Firestore Timestamps are UTC instants; the calendar and every per-day total bucket by the viewer's local day via `src/lib/dates.ts`. An entry crossing midnight belongs entirely to its start day. Never build a wall-clock instant with `new Date("YYYY-MM-DDTHH:mm")`: missing offset is UTC in some engines and local in others. Use `new Date(year, monthIndex, day, hours, minutes)` or `combineLocalDateTime` / `fromDateTimeLocalValue` in `src/lib/time.ts`. `T12:00:00` is only the date-only noon trick for due dates.
+- **Time entries may have `projectId: null` (unassigned).** Description must be trimmed non-empty on start, manual create, and description updates. Enforcement is `entryDescriptionError` in the UI and the write path, not in `firestore.rules`. Null is not a deleted project: display via `timeEntryProjectName` ("Ohne Projekt" vs "Gelöschtes Projekt"); stats keep those buckets apart. Last-project memory persists none as `UNASSIGNED_PROJECT_KEY` (removing the key means not remembered).
 - **Starting a timer stops any timer already running for that user.** That is the single-running-timer guard and it also makes "switch project" one click. It lives in `startTimer`, not in the rules.
 
 <!-- BEGIN:nextjs-agent-rules -->

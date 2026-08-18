@@ -166,7 +166,7 @@ export const timeEntryConverter: FirestoreDataConverter<TimeEntry> = {
     return {
       id: snap.id,
       userId: str(d.userId),
-      projectId: str(d.projectId),
+      projectId: strOrNull(d.projectId),
       taskId: strOrNull(d.taskId),
       description: str(d.description),
       startTime: toDate(d.startTime),
