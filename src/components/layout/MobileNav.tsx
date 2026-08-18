@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { BandSwitcher } from "./BandSwitcher";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/providers/AuthProvider";
+import { useBand } from "@/providers/BandProvider";
 import { cn } from "@/lib/cn";
 
 /**
@@ -22,9 +23,11 @@ export function MobileNav() {
   const pathname = usePathname();
   const [sheetOpen, setSheetOpen] = useState(false);
   const { signOut } = useAuth();
+  const { can } = useBand();
 
-  const primary = NAV_ITEMS.filter((item) => item.primary);
-  const rest = NAV_ITEMS.filter((item) => !item.primary);
+  const visible = NAV_ITEMS.filter((item) => !item.adminOnly || can.isAdmin);
+  const primary = visible.filter((item) => item.primary);
+  const rest = visible.filter((item) => !item.primary);
 
   return (
     <>

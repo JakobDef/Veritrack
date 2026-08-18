@@ -21,6 +21,7 @@ function entry(partial: Partial<TimeEntry> & { userId: string; projectId: string
     endTime: new Date(2026, 7, 9, 20, 0),
     duration: 120,
     createdAt: new Date(),
+    payoutId: null,
     ...partial,
   };
 }

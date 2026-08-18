@@ -20,7 +20,8 @@ export function isActivePath(pathname: string, href: string) {
 export function Sidebar() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
-  const { member } = useBand();
+  const { member, can } = useBand();
+  const items = NAV_ITEMS.filter((item) => !item.adminOnly || can.isAdmin);
 
   return (
     <aside className="border-border bg-surface hidden w-60 shrink-0 flex-col border-r md:flex">
@@ -31,7 +32,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 px-3">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, label, icon: Icon }) => {
           const active = isActivePath(pathname, href);
           return (
             <Link

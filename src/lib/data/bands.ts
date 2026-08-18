@@ -124,12 +124,23 @@ export async function joinBandByInviteCode(
 
 export async function updateBandSettings(
   bandId: string,
-  input: { name?: string; description?: string; photoURL?: string | null },
+  input: {
+    name?: string;
+    description?: string;
+    photoURL?: string | null;
+    hourlyRateCents?: number;
+  },
 ): Promise<void> {
   const payload: Record<string, unknown> = {};
   if (input.name !== undefined) payload.name = input.name.trim();
   if (input.description !== undefined) payload.description = input.description.trim();
   if (input.photoURL !== undefined) payload.photoURL = input.photoURL || null;
+  if (input.hourlyRateCents !== undefined) {
+    if (!Number.isInteger(input.hourlyRateCents) || input.hourlyRateCents < 0) {
+      throw new Error("Stundenlohn muss eine nicht-negative ganze Cent-Zahl sein.");
+    }
+    payload.hourlyRateCents = input.hourlyRateCents;
+  }
   if (Object.keys(payload).length === 0) return;
   await updateDoc(bandDoc(bandId).withConverter(null), payload);
 }

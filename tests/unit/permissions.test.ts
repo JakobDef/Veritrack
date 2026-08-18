@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canCreatePayout,
   canCreateProject,
   canDeleteProject,
   canEditFunctionalRole,
@@ -10,6 +11,7 @@ import {
   canManageBand,
   canManageMembers,
   canReadBand,
+  canReadPayouts,
   canRemoveMember,
   canTrackTime,
   canWrite,
@@ -88,21 +90,45 @@ describe("tasks", () => {
 });
 
 describe("time entries", () => {
-  const ownEntry = { userId: "member" };
-  const foreignEntry = { userId: "someone-else" };
+  const ownEntry = { userId: "member", payoutId: null };
+  const foreignEntry = { userId: "someone-else", payoutId: null };
+  const ownPaid = { userId: "member", payoutId: "payout-1" };
+  const foreignPaid = { userId: "someone-else", payoutId: "payout-1" };
 
-  it("lets a member edit their own entry only", () => {
+  it("lets a member edit their own unpaid entry only", () => {
     expect(canEditTimeEntry(ownEntry, plain)).toBe(true);
     expect(canEditTimeEntry(foreignEntry, plain)).toBe(false);
   });
 
-  it("lets an admin edit anyone's entry", () => {
+  it("lets an admin edit anyone's unpaid entry", () => {
     expect(canEditTimeEntry(ownEntry, admin)).toBe(true);
     expect(canEditTimeEntry(foreignEntry, admin)).toBe(true);
   });
 
-  it("denies a viewer editing even an entry carrying their own uid", () => {
-    expect(canEditTimeEntry({ userId: "viewer" }, viewer)).toBe(false);
+  it("denies a viewer editing even an unpaid entry carrying their own uid", () => {
+    expect(canEditTimeEntry({ userId: "viewer", payoutId: null }, viewer)).toBe(false);
+  });
+
+  it("freezes paid entries for everyone, including admin", () => {
+    expect(canEditTimeEntry(ownPaid, plain)).toBe(false);
+    expect(canEditTimeEntry(ownPaid, admin)).toBe(false);
+    expect(canEditTimeEntry(foreignPaid, admin)).toBe(false);
+  });
+});
+
+describe("payouts are admin-only", () => {
+  it.each([
+    ["admin", admin, true],
+    ["member", plain, false],
+    ["viewer", viewer, false],
+  ] as const)("%s", (_label, subject, expected) => {
+    expect(canReadPayouts(subject)).toBe(expected);
+    expect(canCreatePayout(subject)).toBe(expected);
+  });
+
+  it("keeps rate editing on canManageBand, not a payout helper", () => {
+    expect(canManageBand(admin)).toBe(true);
+    expect(canManageBand(plain)).toBe(false);
   });
 });
 

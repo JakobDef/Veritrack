@@ -23,9 +23,11 @@ You are the reviewer. Your job is to audit completed work against the plan and t
 Green verification commands are not evidence of correctness. The defect classes that cost this project the most were all invisible to a full green run:
 
 - **Sequences, not operations.** For every rule or guard that permits a delete or a state change, ask what the actor can re-create afterwards. Two privilege escalations here were chains of individually legitimate writes; 47 single-operation rules tests missed both.
+- **Unpinned fields on member-writable docs.** If members can already update a document, a new field on that type is writable unless the update rule pins it. Settlement or status fields (`payoutId`) need sequence tests (self-stamp, unpay, create already set). Omitting the key from the UI is not a pin.
 - **Grants derived from immutable fields.** A permission computed from something that never changes can never be revoked.
 - **Duplicated policy that has drifted.** Where two files encode the same rules (`firestore.rules` and `src/lib/permissions.ts`), diff them against each other. Both test suites passing does not mean the two agree; they were written from the same intent, not from each other.
 - **Declared-but-wrong config.** Read each entry in `firestore.indexes.json` against the exact query it serves (field order, direction, presence of `orderBy`) and flag entries that serve no query. The emulator does not enforce indexes, so a mismatch passes locally and fails in production.
+- **Unused capability flags.** A flag on a type (`NavItem.adminOnly`) is not a gate unless every renderer of that list filters it. Check Sidebar and MobileNav independently; MobileNav needs its own `can`.
 - **Anything only visible when rendered.** Overlapping absolutely positioned elements, auto-selected chart ticks, and client read-then-write orders that a rules test never performs.
 
 ## Hard rules

@@ -11,15 +11,19 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useBand } from "@/providers/BandProvider";
 import { deleteBand, updateBandSettings } from "@/lib/data/bands";
+import { centsToEuroInput, eurosToCents } from "@/lib/money";
 
 export default function SettingsPage() {
   const { activeBandId, band, can, loading, setActiveBandId } = useBand();
   const { toast, toastError } = useToast();
   const router = useRouter();
 
-  const [draft, setDraft] = useState<{ name: string; description: string; photoURL: string } | null>(
-    null,
-  );
+  const [draft, setDraft] = useState<{
+    name: string;
+    description: string;
+    photoURL: string;
+    hourlyRate: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -31,6 +35,7 @@ export default function SettingsPage() {
       name: band.name,
       description: band.description,
       photoURL: band.photoURL ?? "",
+      hourlyRate: centsToEuroInput(band.hourlyRateCents),
     });
   }
 
@@ -43,17 +48,32 @@ export default function SettingsPage() {
     );
   }
 
+  const parsedRate = eurosToCents(draft.hourlyRate);
   const dirty =
     draft.name !== band.name ||
     draft.description !== band.description ||
-    draft.photoURL !== (band.photoURL ?? "");
+    draft.photoURL !== (band.photoURL ?? "") ||
+    draft.hourlyRate !== centsToEuroInput(band.hourlyRateCents);
 
   async function onSave(event: React.FormEvent) {
     event.preventDefault();
     if (!activeBandId || !draft) return;
+    const hourlyRateCents = eurosToCents(draft.hourlyRate);
+    if (hourlyRateCents === null) {
+      toast("Stundenlohn ist keine gültige Zahl.", "error");
+      return;
+    }
     setBusy(true);
     try {
-      await updateBandSettings(activeBandId, draft);
+      await updateBandSettings(activeBandId, {
+        name: draft.name,
+        description: draft.description,
+        photoURL: draft.photoURL || null,
+        hourlyRateCents,
+      });
+      setDraft((current) =>
+        current ? { ...current, hourlyRate: centsToEuroInput(hourlyRateCents) } : current,
+      );
       toast("Gespeichert.", "success");
     } catch (err) {
       toastError(err, "Die Einstellungen konnten nicht gespeichert werden.");
@@ -116,12 +136,22 @@ export default function SettingsPage() {
               value={draft.photoURL}
               onChange={(e) => setDraft({ ...draft, photoURL: e.target.value })}
             />
+            <Input
+              label="Stundenlohn"
+              inputMode="decimal"
+              placeholder="€ / h"
+              hint="Euro pro Stunde, für die ganze Band. Offene Stunden nutzen immer den aktuellen Satz."
+              error={parsedRate === null ? "Keine gültige Zahl." : undefined}
+              disabled={!can.manageBand}
+              value={draft.hourlyRate}
+              onChange={(e) => setDraft({ ...draft, hourlyRate: e.target.value })}
+            />
             {can.manageBand ? (
               <Button
                 type="submit"
                 variant="primary"
                 loading={busy}
-                disabled={!dirty || !draft.name.trim()}
+                disabled={!dirty || !draft.name.trim() || parsedRate === null}
                 className="self-start"
               >
                 Speichern

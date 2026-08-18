@@ -11,6 +11,7 @@ import type {
   InviteCode,
   MemberStatus,
   PermissionRole,
+  Payout,
   Project,
   ProjectStatus,
   Task,
@@ -52,6 +53,10 @@ function strOrNull(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function int(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 /** Drop `id` before writing; it lives in the document key. */
 function stripId<T extends { id?: string }>(data: T): DocumentData {
   const { id: _id, ...rest } = data;
@@ -87,6 +92,7 @@ export const bandConverter: FirestoreDataConverter<Band> = {
       createdBy: str(d.createdBy),
       inviteCode: str(d.inviteCode),
       seeded: d.seeded === true,
+      hourlyRateCents: int(d.hourlyRateCents, 0),
     };
   },
 };
@@ -173,6 +179,23 @@ export const timeEntryConverter: FirestoreDataConverter<TimeEntry> = {
       endTime: toDateOrNull(d.endTime),
       duration: typeof d.duration === "number" ? d.duration : null,
       createdAt: toDate(d.createdAt),
+      payoutId: strOrNull(d.payoutId),
+    };
+  },
+};
+
+export const payoutConverter: FirestoreDataConverter<Payout> = {
+  toFirestore: stripId,
+  fromFirestore(snap: QueryDocumentSnapshot, options?: SnapshotOptions): Payout {
+    const d = snap.data(options);
+    return {
+      id: snap.id,
+      userId: str(d.userId),
+      minutes: int(d.minutes),
+      hourlyRateCents: int(d.hourlyRateCents),
+      amountCents: int(d.amountCents),
+      createdAt: toDate(d.createdAt),
+      createdBy: str(d.createdBy),
     };
   },
 };

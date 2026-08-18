@@ -53,6 +53,8 @@ export type Band = {
    * permanently afterwards. See `firestore.rules`.
    */
   seeded: boolean;
+  /** Integer euro-cents per hour. `0` means the band has not set a rate. */
+  hourlyRateCents: number;
 };
 
 export type BandMember = {
@@ -105,6 +107,19 @@ export type TimeEntry = {
   /** Whole minutes; `null` while running. */
   duration: number | null;
   createdAt: Date;
+  /** `null` / missing = unpaid. Once set, the entry is frozen. */
+  payoutId: string | null;
+};
+
+/** Snapshot of one person's hours at the rate that applied when they were paid. */
+export type Payout = {
+  id: string;
+  userId: string;
+  minutes: number;
+  hourlyRateCents: number;
+  amountCents: number;
+  createdAt: Date;
+  createdBy: string;
 };
 
 /** Lists, stats, and filters: an entry with `projectId === null`. */
@@ -154,7 +169,7 @@ export const PERMISSION_ROLE_LABELS: Record<PermissionRole, string> = {
 };
 
 export const PERMISSION_ROLE_HINTS: Record<PermissionRole, string> = {
-  admin: "Verwaltet Band, Mitglieder und Projekte.",
+  admin: "Verwaltet Band, Mitglieder, Projekte und Abrechnung.",
   member: "Trackt Zeit und bearbeitet Aufgaben.",
   viewer: "Sieht alles, ändert nichts.",
 };

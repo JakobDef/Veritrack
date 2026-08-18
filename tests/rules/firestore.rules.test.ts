@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { assertFails, assertSucceeds, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from "firebase/firestore";
 import {
   ADMIN,
   BAND_ID,
@@ -43,6 +43,17 @@ const taskRef = (db: ReturnType<typeof as>, taskId = TASK_ID_1) =>
   doc(db, "bands", BAND_ID, "projects", PROJECT_ID_1, "tasks", taskId);
 const entryRef = (db: ReturnType<typeof as>, entryId: string) =>
   doc(db, "bands", BAND_ID, "timeEntries", entryId);
+const payoutRef = (db: ReturnType<typeof as>, payoutId = "payout-1") =>
+  doc(db, "bands", BAND_ID, "payouts", payoutId);
+
+const payoutPayload = (createdBy: string) => ({
+  userId: MEMBER,
+  minutes: 120,
+  hourlyRateCents: 1250,
+  amountCents: 2500,
+  createdAt: new Date(),
+  createdBy,
+});
 
 describe("band reads", () => {
   it("denies an anonymous visitor", async () => {
@@ -87,6 +98,20 @@ describe("band settings", () => {
 
   it("denies rewriting createdBy, even as admin", async () => {
     await assertFails(updateDoc(bandRef(as(env, ADMIN)), { createdBy: MEMBER }));
+  });
+
+  it("allows an admin to set hourlyRateCents", async () => {
+    await assertSucceeds(updateDoc(bandRef(as(env, ADMIN)), { hourlyRateCents: 1250 }));
+  });
+
+  it("denies a member setting hourlyRateCents", async () => {
+    await assertFails(updateDoc(bandRef(as(env, MEMBER)), { hourlyRateCents: 1250 }));
+  });
+
+  it("denies flipping seeded back to false in the same write as a rate change", async () => {
+    await assertFails(
+      updateDoc(bandRef(as(env, ADMIN)), { hourlyRateCents: 1250, seeded: false }),
+    );
   });
 });
 
@@ -227,6 +252,90 @@ describe("time entries", () => {
         createdAt: new Date(),
       }),
     );
+  });
+
+  it("allows an admin to stamp payoutId on an unpaid completed entry", async () => {
+    await assertSucceeds(
+      updateDoc(entryRef(as(env, ADMIN), ENTRY_OF_MEMBER), { payoutId: "p-1" }),
+    );
+  });
+
+  it("denies an admin stamping payoutId on a running entry", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "bands", BAND_ID, "timeEntries", "running"), {
+        userId: MEMBER,
+        projectId: PROJECT_ID_1,
+        taskId: null,
+        description: "Läuft",
+        startTime: new Date(),
+        endTime: null,
+        duration: null,
+        createdAt: new Date(),
+      });
+    });
+    await assertFails(updateDoc(entryRef(as(env, ADMIN), "running"), { payoutId: "p-1" }));
+  });
+
+  it("still allows an admin to edit the description of an unpaid entry", async () => {
+    await assertSucceeds(
+      updateDoc(entryRef(as(env, ADMIN), ENTRY_OF_MEMBER), { description: "Unbezahlt ok" }),
+    );
+  });
+
+  it("still allows a member to edit and delete their own unpaid entry", async () => {
+    await assertSucceeds(
+      updateDoc(entryRef(as(env, MEMBER), ENTRY_OF_MEMBER), { description: "Unbezahlt eigen" }),
+    );
+    await assertSucceeds(deleteDoc(entryRef(as(env, MEMBER), ENTRY_OF_MEMBER)));
+  });
+
+  it("denies an admin deleting a paid entry", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "bands", BAND_ID, "timeEntries", "paid-admin"), {
+        userId: MEMBER,
+        projectId: PROJECT_ID_1,
+        taskId: null,
+        description: "Bezahlt",
+        startTime: new Date("2026-08-01T18:00:00Z"),
+        endTime: new Date("2026-08-01T20:00:00Z"),
+        duration: 120,
+        createdAt: new Date(),
+        payoutId: "p-1",
+      });
+    });
+    await assertFails(deleteDoc(entryRef(as(env, ADMIN), "paid-admin")));
+  });
+
+  it("allows an admin to delete an unpaid entry", async () => {
+    await assertSucceeds(deleteDoc(entryRef(as(env, ADMIN), ENTRY_OF_MEMBER)));
+  });
+});
+
+describe("payouts", () => {
+  it("allows an admin to create a payout with createdBy matching auth.uid", async () => {
+    await assertSucceeds(setDoc(payoutRef(as(env, ADMIN)), payoutPayload(ADMIN)));
+  });
+
+  it("denies payout update even for an admin", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "bands", BAND_ID, "payouts", "payout-1"), payoutPayload(ADMIN));
+    });
+    await assertFails(updateDoc(payoutRef(as(env, ADMIN)), { amountCents: 1 }));
+  });
+
+  it("denies payout delete even for an admin", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "bands", BAND_ID, "payouts", "payout-1"), payoutPayload(ADMIN));
+    });
+    await assertFails(deleteDoc(payoutRef(as(env, ADMIN))));
+  });
+
+  it("allows an admin to get and list payouts", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "bands", BAND_ID, "payouts", "payout-1"), payoutPayload(ADMIN));
+    });
+    await assertSucceeds(getDoc(payoutRef(as(env, ADMIN))));
+    await assertSucceeds(getDocs(collection(as(env, ADMIN), "bands", BAND_ID, "payouts")));
   });
 });
 

@@ -65,14 +65,24 @@ export function canTrackTime(member: Member): boolean {
   return canWrite(member);
 }
 
-/** Own entries always; an admin may correct anyone's. */
+/** Own unpaid entries always; an admin may correct anyone's unpaid entry. Paid is frozen. */
 export function canEditTimeEntry(
-  entry: Pick<TimeEntry, "userId">,
+  entry: Pick<TimeEntry, "userId" | "payoutId">,
   member: Member,
 ): boolean {
+  if (entry.payoutId != null) return false;
   if (!isActive(member)) return false;
   if (isAdmin(member)) return true;
   return canWrite(member) && entry.userId === member.id;
+}
+
+/** Payout history and create are admin-only. Mirrors `match /payouts/{payoutId}`. */
+export function canReadPayouts(member: Member): boolean {
+  return isAdmin(member);
+}
+
+export function canCreatePayout(member: Member): boolean {
+  return isAdmin(member);
 }
 
 /** Members may edit their own functional role and color; admins may edit anyone's. */

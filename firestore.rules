@@ -195,18 +195,52 @@ service cloud.firestore {
         allow read: if isMember(bandId);
 
         allow create: if canWrite(bandId)
-          && request.resource.data.userId == request.auth.uid;
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.get('payoutId', null) == null;
 
-        // Own entry, or an admin correcting someone else's. An update may never
-        // reassign the entry to a different user.
+        // Paid entries are frozen. Unpaid entries stay owner-or-admin, except an
+        // admin may stamp `payoutId` alone on a completed entry. Do not
+        // `exists()` the payout doc: batches evaluate against pre-batch state,
+        // so a create-payout-plus-stamp batch would always deny.
         allow update: if request.resource.data.userId == resource.data.userId
+          && resource.data.get('payoutId', null) == null
+          && (
+            (
+              request.resource.data.get('payoutId', null) == null
+              && (
+                isAdmin(bandId)
+                || (canWrite(bandId) && resource.data.userId == request.auth.uid)
+              )
+            )
+            || (
+              isAdmin(bandId)
+              && request.resource.data.payoutId is string
+              && request.resource.data.payoutId.size() > 0
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['payoutId'])
+              && resource.data.endTime != null
+              && resource.data.duration is int
+            )
+          );
+
+        allow delete: if resource.data.get('payoutId', null) == null
           && (
             isAdmin(bandId)
             || (canWrite(bandId) && resource.data.userId == request.auth.uid)
           );
+      }
 
-        allow delete: if isAdmin(bandId)
-          || (canWrite(bandId) && resource.data.userId == request.auth.uid);
+      // ---- payouts ---------------------------------------------------------
+      // Frozen snapshots. Admin read/create only. No update or delete in v1,
+      // including by admins: reversing a payout is a future feature.
+      match /payouts/{payoutId} {
+        allow read: if isAdmin(bandId);
+        allow create: if isAdmin(bandId)
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.userId is string
+          && request.resource.data.minutes is int
+          && request.resource.data.hourlyRateCents is int
+          && request.resource.data.amountCents is int;
+        allow update, delete: if false;
       }
     }
 

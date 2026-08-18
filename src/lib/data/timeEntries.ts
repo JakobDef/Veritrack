@@ -45,6 +45,7 @@ export async function startTimer(
     endTime: null,
     duration: null,
     createdAt: serverTimestamp(),
+    payoutId: null,
   });
   return ref.id;
 }
@@ -107,6 +108,7 @@ export async function createManualEntry(
     endTime: input.endTime,
     duration: toMinutes(input.startTime, input.endTime),
     createdAt: serverTimestamp(),
+    payoutId: null,
   });
   return ref.id;
 }

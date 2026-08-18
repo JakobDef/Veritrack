@@ -94,9 +94,14 @@ export function TimeEntryList({
                   {running ? (
                     <Badge tone="accent">läuft</Badge>
                   ) : (
-                    <span className="tabular shrink-0 font-mono text-sm font-medium">
-                      {formatDuration(entry.duration)}
-                    </span>
+                    <>
+                      {entry.payoutId ? (
+                        <Badge tone="neutral">Bezahlt</Badge>
+                      ) : null}
+                      <span className="tabular shrink-0 font-mono text-sm font-medium">
+                        {formatDuration(entry.duration)}
+                      </span>
+                    </>
                   )}
 
                   <div className="flex shrink-0 items-center gap-0.5 md:opacity-0 md:transition-opacity md:group-focus-within:opacity-100 md:group-hover:opacity-100">

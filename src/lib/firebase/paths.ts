@@ -4,6 +4,7 @@ import {
   bandConverter,
   inviteCodeConverter,
   memberConverter,
+  payoutConverter,
   projectConverter,
   taskConverter,
   timeEntryConverter,
@@ -49,3 +50,8 @@ export const timeEntriesCol = (bandId: string) =>
   collection(db, "bands", bandId, "timeEntries").withConverter(timeEntryConverter);
 export const timeEntryDoc = (bandId: string, entryId: string) =>
   doc(db, "bands", bandId, "timeEntries", entryId).withConverter(timeEntryConverter);
+
+export const payoutsCol = (bandId: string) =>
+  collection(db, "bands", bandId, "payouts").withConverter(payoutConverter);
+export const payoutDoc = (bandId: string, payoutId: string) =>
+  doc(db, "bands", bandId, "payouts", payoutId).withConverter(payoutConverter);

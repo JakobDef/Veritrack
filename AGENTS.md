@@ -62,7 +62,7 @@ Project agents in `.claude/agents/` register natively: dispatch them by name via
 | ------------- | -------------------------------------------------- | --------------------------------------------------------------- |
 | `planner`     | Before any non-trivial change                      | `.docs/plans/YYYY-MM-DD-<slug>.md`                              |
 | `implementer` | After a plan exists                                | Code changes, completion note on the plan                       |
-| `reviewer`    | After implementer finishes                         | Severity-tagged findings; hunts escalation sequences, policy drift, wrong indexes, render-only defects |
+| `reviewer`    | After implementer finishes                         | Severity-tagged findings; hunts escalation sequences, unpinned writable fields, unused flags, policy drift, wrong indexes, render-only defects |
 | `researcher`  | When you need codebase or external context         | `.docs/research/YYYY-MM-DD-<slug>.md`                           |
 | `debugger`    | When something is broken and root cause is unclear | Root cause analysis + proposed fix                              |
 | `learner`     | After a meaningful task, OR via `/learn`           | New entries in `.docs/learnings/`, edits to agents or AGENTS.md |
@@ -164,11 +164,12 @@ See `.docs/rules/verification.md` for the commands and the order to run them. Sh
 |------|---------|
 | `src/app/(auth)/` | Login and signup, unauthenticated shell |
 | `src/app/(app)/` | Authenticated shell and every product route |
+| `src/app/(app)/payout/` | Admin-only payout screen |
 | `src/components/ui/` | Design-system primitives, no feature logic |
 | `src/components/timer/` | Dashboard timer, project picker, persistent bar |
 | `src/lib/firebase/` | Client singleton, typed path builders, converters |
 | `src/lib/data/` | All Firestore writes, one module per collection |
-| `src/lib/` | Pure helpers: time, dates, stats, permissions, colors |
+| `src/lib/` | Pure helpers: time, dates, stats, permissions, money, colors |
 | `src/providers/` | Auth, active band and theme context |
 | `src/hooks/` | `onSnapshot` subscriptions and local storage |
 | `firestore.rules` | Security rules, mirrored by `src/lib/permissions.ts` |
@@ -183,6 +184,8 @@ See `.docs/rules/verification.md` for the commands and the order to run them. Sh
 - **No raw hex or Tailwind palette colors in components.** Add a token to `globals.css` instead. The `role-1..8` slot order is validated for colour-vision separation between neighbouring slots, so re-run the palette validator before reordering or restyling it.
 - **Dates are local-time throughout.** Firestore Timestamps are UTC instants; the calendar and every per-day total bucket by the viewer's local day via `src/lib/dates.ts`. An entry crossing midnight belongs entirely to its start day. Never build a wall-clock instant with `new Date("YYYY-MM-DDTHH:mm")`: missing offset is UTC in some engines and local in others. Use `new Date(year, monthIndex, day, hours, minutes)` or `combineLocalDateTime` / `fromDateTimeLocalValue` in `src/lib/time.ts`. `T12:00:00` is only the date-only noon trick for due dates.
 - **Time entries may have `projectId: null` (unassigned).** Description must be trimmed non-empty on start, manual create, and description updates. Enforcement is `entryDescriptionError` in the UI and the write path, not in `firestore.rules`. Null is not a deleted project: display via `timeEntryProjectName` ("Ohne Projekt" vs "Gelöschtes Projekt"); stats keep those buckets apart. Last-project memory persists none as `UNASSIGNED_PROJECT_KEY` (removing the key means not remembered).
+- **Time entries may have `payoutId: null` (unpaid).** Missing field and null are both unpaid; converters map missing to null. Members can update own unpaid entries, so `payoutId` is pinned in rules (create must be null; admin stamp is `hasOnly(['payoutId'])` on a completed entry). Once set they are frozen, including for admin. Open totals use the current `Band.hourlyRateCents` (integer euro-cents via `src/lib/money.ts`; 0 means unset). History lives at `bands/{id}/payouts` with snapshotted `minutes` / `hourlyRateCents` / `amountCents` and is never recomputed from the live rate. Filter unpaid completed entries in memory; do not query `where("payoutId", "==", null)` (old docs without the field would not match).
+- **`NavItem.adminOnly` is consumed.** Sidebar and MobileNav both skip those items unless `can.isAdmin`. The page still redirects non-admins. Setting the flag without both filters is not a hide.
 - **Starting a timer stops any timer already running for that user.** That is the single-running-timer guard and it also makes "switch project" one click. It lives in `startTimer`, not in the rules.
 
 <!-- BEGIN:nextjs-agent-rules -->
