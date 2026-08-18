@@ -10,6 +10,7 @@ import { Input, Textarea } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useBand } from "@/providers/BandProvider";
+import { InvitePanel } from "@/components/members/InvitePanel";
 import { deleteBand, updateBandSettings } from "@/lib/data/bands";
 import { centsToEuroInput, eurosToCents } from "@/lib/money";
 
@@ -160,6 +161,14 @@ export default function SettingsPage() {
           </form>
         </CardBody>
       </Card>
+
+      {activeBandId && band ? (
+        <InvitePanel
+          bandId={activeBandId}
+          inviteCode={band.inviteCode}
+          canManage={can.manageBand}
+        />
+      ) : null}
 
       {can.manageBand ? (
         <Card className="border-danger/30">

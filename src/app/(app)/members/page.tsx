@@ -136,10 +136,14 @@ export default function MembersPage() {
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold">Mitglieder</h1>
         <p className="text-muted text-sm">
-          {band?.name ?? "Band"} · {members.length}{" "}
+          Einladen, Rollen und Rechte. {band?.name ?? "Band"} · {members.length}{" "}
           {members.length === 1 ? "Person" : "Personen"}
         </p>
       </header>
+
+      {activeBandId && band ? (
+        <InvitePanel bandId={activeBandId} inviteCode={band.inviteCode} canManage={can.manageBand} />
+      ) : null}
 
       <div className="border-border bg-surface-2/50 text-muted flex items-start gap-2 rounded-md border p-3 text-xs">
         <Info className="text-faint mt-0.5 size-3.5 shrink-0" aria-hidden />
@@ -147,13 +151,9 @@ export default function MembersPage() {
           <strong className="text-text font-medium">Rolle</strong> beschreibt, was jemand in der
           Band macht, und ist rein informativ.{" "}
           <strong className="text-text font-medium">Berechtigung</strong> steuert, was jemand in
-          Veritrack darf. Die beiden hängen bewusst nicht zusammen.
+          Veritrack darf.           Die beiden hängen bewusst nicht zusammen.
         </p>
       </div>
-
-      {activeBandId && band ? (
-        <InvitePanel bandId={activeBandId} inviteCode={band.inviteCode} canManage={can.manageBand} />
-      ) : null}
 
       <Card>
         <CardBody>

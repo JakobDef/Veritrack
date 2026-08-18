@@ -25,7 +25,6 @@ import { UNASSIGNED_PROJECT_KEY, UNASSIGNED_PROJECT_LABEL, type TimeEntry } from
 import { cn } from "@/lib/cn";
 
 type Granularity = "week" | "month";
-type Scope = "mine" | "band";
 
 export default function TimePage() {
   const { user } = useAuth();
@@ -34,7 +33,7 @@ export default function TimePage() {
   const { toast, toastError } = useToast();
 
   const [granularity, setGranularity] = useState<Granularity>("week");
-  const [scope, setScope] = useState<Scope>("mine");
+  const [memberFilter, setMemberFilter] = useState(() => user?.uid ?? "all");
   const [offset, setOffset] = useState(0);
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [formEntry, setFormEntry] = useState<TimeEntry | null>(null);
@@ -55,17 +54,22 @@ export default function TimePage() {
 
   const { entries, loading, error } = useTimeEntries({
     bandId: activeBandId,
-    userId: scope === "mine" ? user?.uid : undefined,
     range,
   });
 
+  const memberOptions = useMemo(
+    () => [...members].sort((a, b) => a.displayName.localeCompare(b.displayName, "de")),
+    [members],
+  );
+
   const visible = useMemo(() => {
-    if (projectFilter === "all") return entries;
-    if (projectFilter === UNASSIGNED_PROJECT_KEY) {
-      return entries.filter((e) => e.projectId === null);
-    }
-    return entries.filter((e) => e.projectId === projectFilter);
-  }, [entries, projectFilter]);
+    return entries.filter((e) => {
+      if (memberFilter !== "all" && e.userId !== memberFilter) return false;
+      if (projectFilter === "all") return true;
+      if (projectFilter === UNASSIGNED_PROJECT_KEY) return e.projectId === null;
+      return e.projectId === projectFilter;
+    });
+  }, [entries, memberFilter, projectFilter]);
 
   const totalMinutes = visible.reduce((sum, entry) => sum + (entry.duration ?? 0), 0);
   const daysWithEntries = new Set(visible.map((e) => e.startTime.toDateString())).size;
@@ -179,26 +183,20 @@ export default function TimePage() {
           ))}
         </select>
 
-        <div className="border-border bg-surface-2 inline-flex rounded-md border p-0.5">
-          {(
-            [
-              ["mine", "Nur ich"],
-              ["band", "Ganze Band"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setScope(value)}
-              className={cn(
-                "rounded-sm px-3 py-1 text-xs font-medium transition-colors",
-                scope === value ? "bg-surface text-text shadow-sm" : "text-muted hover:text-text",
-              )}
-            >
-              {label}
-            </button>
+        <select
+          aria-label="Person filtern"
+          value={memberFilter}
+          onChange={(e) => setMemberFilter(e.target.value)}
+          className="border-border bg-surface text-text h-8 rounded-md border px-2 text-xs"
+        >
+          <option value="all">Alle Personen</option>
+          {memberOptions.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.displayName}
+              {m.id === user?.uid ? " (du)" : ""}
+            </option>
           ))}
-        </div>
+        </select>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -250,7 +248,7 @@ export default function TimePage() {
               entries={visible}
               projectsById={projectsById}
               membersById={membersById}
-              showOwner={scope === "band"}
+              showOwner={memberFilter === "all"}
               canEdit={(entry) => canEditTimeEntry(entry, member)}
               onEdit={(entry) => {
                 setFormEntry(entry);

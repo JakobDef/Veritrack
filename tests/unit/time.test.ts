@@ -4,7 +4,9 @@ import {
   formatClock,
   formatDuration,
   formatHours,
+  formatTimeOfDay,
   fromDateTimeLocalValue,
+  normalizeClockInput,
   toDateTimeLocalValue,
   combineLocalDateTime,
   entryRangeError,
@@ -78,6 +80,28 @@ describe("formatHours", () => {
   });
 });
 
+describe("formatTimeOfDay", () => {
+  it("always uses 24-hour clock, including morning hours", () => {
+    expect(formatTimeOfDay(new Date(2026, 7, 14, 7, 5))).toBe("07:05");
+    expect(formatTimeOfDay(new Date(2026, 7, 14, 19, 0))).toBe("19:00");
+    expect(formatTimeOfDay(new Date(2026, 7, 14, 0, 0))).toBe("00:00");
+  });
+});
+
+describe("normalizeClockInput", () => {
+  it("pads a one-digit hour and fills missing minutes", () => {
+    expect(normalizeClockInput("7:00")).toBe("07:00");
+    expect(normalizeClockInput("7")).toBe("07:00");
+    expect(normalizeClockInput("19:5")).toBe("19:05");
+  });
+
+  it("rejects 12-hour markers and impossible clocks", () => {
+    expect(normalizeClockInput("7:00 PM")).toBeNull();
+    expect(normalizeClockInput("24:00")).toBeNull();
+    expect(normalizeClockInput("12:60")).toBeNull();
+  });
+});
+
 describe("toMinutes", () => {
   it("rounds to the nearest minute", () => {
     const start = new Date("2026-08-09T10:00:00Z");
@@ -133,8 +157,8 @@ describe("datetime-local round trip", () => {
   });
 
   it("combines a date input and a time input as local", () => {
-    const combined = combineLocalDateTime("2026-08-14", "09:00");
-    expect(combined?.getHours()).toBe(9);
+    const combined = combineLocalDateTime("2026-08-14", "7:00");
+    expect(combined?.getHours()).toBe(7);
     expect(combined?.getDate()).toBe(14);
     expect(combineLocalDateTime("", "09:00")).toBeNull();
     expect(combineLocalDateTime("2026-08-14", "")).toBeNull();

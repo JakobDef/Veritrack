@@ -59,18 +59,24 @@ export function Sidebar() {
       <div className="flex flex-col gap-3 p-3">
         <BandSwitcher />
         <div className="border-border flex items-center gap-2 border-t pt-3">
-          <Avatar
-            name={member?.displayName ?? user?.displayName ?? user?.email}
-            src={user?.photoURL}
-            color={member ? roleColorVar(member.roleColor) : null}
-            size="sm"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium">
-              {member?.displayName ?? user?.displayName ?? "Du"}
-            </p>
-            {member?.role ? <p className="text-faint truncate text-[11px]">{member.role}</p> : null}
-          </div>
+          <Link
+            href="/account"
+            className="hover:bg-surface-2 flex min-w-0 flex-1 items-center gap-2 rounded-md px-0.5 py-0.5"
+            title="Profil bearbeiten"
+          >
+            <Avatar
+              name={member?.displayName ?? user?.displayName ?? user?.email}
+              src={member?.photoURL ?? user?.photoURL}
+              color={member ? roleColorVar(member.roleColor) : null}
+              size="sm"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium">
+                {member?.displayName ?? user?.displayName ?? "Du"}
+              </p>
+              {member?.role ? <p className="text-faint truncate text-[11px]">{member.role}</p> : null}
+            </div>
+          </Link>
           <button
             type="button"
             onClick={() => void signOut()}

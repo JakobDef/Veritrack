@@ -164,6 +164,7 @@ See `.docs/rules/verification.md` for the commands and the order to run them. Sh
 |------|---------|
 | `src/app/(auth)/` | Login and signup, unauthenticated shell |
 | `src/app/(app)/` | Authenticated shell and every product route |
+| `src/app/(app)/account/` | Own name and photo |
 | `src/app/(app)/payout/` | Admin-only payout screen |
 | `src/components/ui/` | Design-system primitives, no feature logic |
 | `src/components/timer/` | Dashboard timer, project picker, persistent bar |

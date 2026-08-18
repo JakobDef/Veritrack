@@ -20,3 +20,4 @@ Next time:
 - Never `new Date("YYYY-MM-DDTHH:mm")` (or a template of the same shape) for a local clock. Use `new Date(year, monthIndex, day, hours, minutes)` or `combineLocalDateTime`. `T12:00:00` is only a date-only noon trick, not a clock parser.
 - A check that exists only on the write path shows up as a toast with a live submit button. Share the predicate with the form's inline error.
 - A "nachtragen" form must default to a range that is already in the past. Evening rehearsal hours are not a valid blank.
+- Display is a separate trap from parsing: `toLocaleTimeString("de-DE")` is not 24h. See `.docs/learnings/2026-08-18-locale-is-not-24h.md`.

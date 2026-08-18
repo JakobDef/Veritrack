@@ -28,7 +28,7 @@ Green verification commands are not evidence of correctness. The defect classes 
 - **Duplicated policy that has drifted.** Where two files encode the same rules (`firestore.rules` and `src/lib/permissions.ts`), diff them against each other. Both test suites passing does not mean the two agree; they were written from the same intent, not from each other.
 - **Declared-but-wrong config.** Read each entry in `firestore.indexes.json` against the exact query it serves (field order, direction, presence of `orderBy`) and flag entries that serve no query. The emulator does not enforce indexes, so a mismatch passes locally and fails in production.
 - **Unused capability flags.** A flag on a type (`NavItem.adminOnly`) is not a gate unless every renderer of that list filters it. Check Sidebar and MobileNav independently; MobileNav needs its own `can`.
-- **Anything only visible when rendered.** Overlapping absolutely positioned elements, auto-selected chart ticks, and client read-then-write orders that a rules test never performs.
+- **Anything only visible when rendered.** Overlapping absolutely positioned elements, auto-selected chart ticks, and client read-then-write orders that a rules test never performs. Clock strings via `toLocaleTimeString` (even `"de-DE"`) still follow the OS 12h clock on some browsers; display goes through `formatTimeOfDay` (`date-fns` `HH:mm`), and native time inputs need `lang="de"` on the control.
 
 ## Hard rules
 - You write reviews. You do not write fixes. The implementer fixes.

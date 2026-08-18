@@ -1,4 +1,4 @@
-import { BarChart3, CalendarRange, Clock, FolderKanban, LayoutDashboard, Settings, Users, Wallet } from "lucide-react";
+import { BarChart3, CalendarRange, Clock, FolderKanban, LayoutDashboard, Settings, UserRound, Users, Wallet } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type NavItem = {
@@ -18,5 +18,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/stats", label: "Statistik", icon: BarChart3 },
   { href: "/payout", label: "Abrechnung", icon: Wallet, adminOnly: true },
   { href: "/members", label: "Mitglieder", icon: Users },
+  { href: "/account", label: "Profil", icon: UserRound },
   { href: "/settings", label: "Einstellungen", icon: Settings },
 ];

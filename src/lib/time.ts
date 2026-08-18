@@ -1,3 +1,5 @@
+import { format } from "date-fns";
+
 /**
  * Duration math and formatting.
  *
@@ -52,9 +54,26 @@ export function minutesToMs(minutes: number): number {
   return minutes * MS_PER_MINUTE;
 }
 
-/** "14:05" in the viewer's local timezone. */
+/** "14:05" in the viewer's local timezone. Always 24-hour, never AM/PM. */
 export function formatTimeOfDay(date: Date): string {
-  return date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return format(date, "HH:mm");
+}
+
+/**
+ * Normalize a typed clock to `HH:mm`. Accepts `7:00`, `07:00`, `7`.
+ * Native `<input type="time">` follows the OS 12-hour picker, so the form
+ * uses a text field and this helper instead.
+ */
+export function normalizeClockInput(value: string): string | null {
+  const trimmed = value.trim().replace(/[.,]/g, ":");
+  const match = /^(\d{1,2})(?::(\d{1,2}))?$/.exec(trimmed);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = match[2] === undefined || match[2] === "" ? 0 : Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours > 23 || minutes > 59) {
+    return null;
+  }
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 /** Value for an `<input type="datetime-local">`, which expects local time. */
@@ -105,7 +124,9 @@ export function fromDateTimeLocalValue(value: string): Date | null {
 /** Combines a `yyyy-MM-dd` date and an `HH:mm` (optional seconds) time as local. */
 export function combineLocalDateTime(date: string, time: string): Date | null {
   if (!date || !time) return null;
-  return fromDateTimeLocalValue(`${date}T${time}`);
+  const clock = normalizeClockInput(time);
+  if (!clock) return null;
+  return fromDateTimeLocalValue(`${date}T${clock}`);
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;

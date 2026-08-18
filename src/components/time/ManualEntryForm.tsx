@@ -16,6 +16,7 @@ import {
   entryDescriptionError,
   entryRangeError,
   formatDuration,
+  normalizeClockInput,
   toMinutes,
 } from "@/lib/time";
 import { UNASSIGNED_PROJECT_KEY, type Project, type TimeEntry } from "@/types/models";
@@ -247,17 +248,35 @@ export function ManualEntryForm({
           />
           <Input
             label="Von"
-            type="time"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            className="tabular font-mono"
+            placeholder="07:00"
+            hint="24 Stunden"
             required
             value={draft.start}
             onChange={(e) => setDraft((d) => ({ ...d, start: e.target.value }))}
+            onBlur={() => {
+              const next = normalizeClockInput(draft.start);
+              if (next) setDraft((d) => ({ ...d, start: next }));
+            }}
           />
           <Input
             label="Bis"
-            type="time"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            className="tabular font-mono"
+            placeholder="09:00"
+            hint="24 Stunden"
             required
             value={draft.end}
             onChange={(e) => setDraft((d) => ({ ...d, end: e.target.value }))}
+            onBlur={() => {
+              const next = normalizeClockInput(draft.end);
+              if (next) setDraft((d) => ({ ...d, end: next }));
+            }}
           />
         </div>
 
