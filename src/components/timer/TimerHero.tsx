@@ -125,8 +125,12 @@ export function TimerHero() {
   return (
     <section
       className={cn(
-        "relative overflow-hidden rounded-lg border p-6 transition-shadow duration-300 sm:p-7",
-        running ? "border-transparent shadow-glow" : "border-border bg-surface",
+        "relative rounded-lg border p-6 transition-shadow duration-300 sm:p-7",
+        // overflow-hidden clips the project listbox. Only the running tile needs
+        // it, to crop the accent bar to the rounded corners.
+        running
+          ? "overflow-hidden border-transparent shadow-glow"
+          : "border-border bg-surface",
       )}
       style={
         running
