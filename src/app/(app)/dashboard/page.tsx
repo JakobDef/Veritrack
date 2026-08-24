@@ -2,14 +2,18 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Clock3, FolderKanban, ListTodo, Play, Timer } from "lucide-react";
+import { CalendarDays, Clock3, FolderKanban, ListTodo, Play, Timer, Trash2 } from "lucide-react";
 import { TimerHero } from "@/components/timer/TimerHero";
 import { TeamActivity } from "@/components/timer/TeamActivity";
 import { StatNugget } from "@/components/stats/StatNugget";
+import { ManualEntryForm } from "@/components/time/ManualEntryForm";
+import { EntryOpenTarget } from "@/components/time/TimeEntryList";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
+import { ConfirmDialog } from "@/components/ui/Dialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonList } from "@/components/ui/Skeleton";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useAuth } from "@/providers/AuthProvider";
 import { useBand } from "@/providers/BandProvider";
@@ -17,10 +21,11 @@ import { useLastProject } from "@/hooks/useLastProject";
 import { useProjects } from "@/hooks/useProjects";
 import { useTimeEntries } from "@/hooks/useTimeEntries";
 import { useMyOpenTasks } from "@/hooks/useTasks";
-import { startTimer } from "@/lib/data/timeEntries";
+import { deleteEntry, startTimer } from "@/lib/data/timeEntries";
 import { dayRange, formatDateShort, weekRange } from "@/lib/dates";
 import { formatDuration, formatTimeOfDay } from "@/lib/time";
 import { timeEntryProjectName } from "@/lib/projectLabel";
+import { canEditTimeEntry } from "@/lib/permissions";
 import { roleColorVar } from "@/lib/roleColors";
 import { TASK_PRIORITY_LABELS, type TimeEntry } from "@/types/models";
 
@@ -29,8 +34,12 @@ export default function DashboardPage() {
   const { activeBandId, band, member, can } = useBand();
   const { projects, byId } = useProjects(activeBandId);
   const { remember } = useLastProject(activeBandId);
-  const { toastError } = useToast();
+  const { toast, toastError } = useToast();
   const [restartingId, setRestartingId] = useState<string | null>(null);
+  const [formEntry, setFormEntry] = useState<TimeEntry | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<TimeEntry | null>(null);
+  const [busy, setBusy] = useState(false);
 
   // Captured once on mount: the ranges must stay stable across renders or every
   // render would build a new query. The day rolls over on the next remount,
@@ -77,6 +86,20 @@ export default function DashboardPage() {
       toastError(err, "Der Timer konnte nicht gestartet werden.");
     } finally {
       setRestartingId(null);
+    }
+  }
+
+  async function onDelete() {
+    if (!activeBandId || !pendingDelete) return;
+    setBusy(true);
+    try {
+      await deleteEntry(activeBandId, pendingDelete.id);
+      toast("Eintrag gelöscht.", "info");
+      setPendingDelete(null);
+    } catch (err) {
+      toastError(err, "Der Eintrag konnte nicht gelöscht werden.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -207,48 +230,71 @@ export default function DashboardPage() {
               {recent.map((entry) => {
                 const project = entry.projectId ? byId.get(entry.projectId) : undefined;
                 const running = entry.endTime === null;
+                const editable = canEditTimeEntry(entry, member);
+                const openable = editable && !running;
                 return (
                   <li
                     key={entry.id}
-                    className="border-border flex items-center gap-3 border-b py-2.5 last:border-0"
+                    className="group hover:bg-surface-2 -mx-2 flex items-center gap-3 rounded-md px-2 py-2.5"
                   >
-                    <span
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: roleColorVar(project?.color) }}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm">
-                        {timeEntryProjectName(entry.projectId, project)}
-                        {entry.description ? (
-                          <span className="text-muted"> · {entry.description}</span>
-                        ) : null}
+                    <EntryOpenTarget
+                      openable={openable}
+                      label={`Eintrag bearbeiten: ${timeEntryProjectName(entry.projectId, project)}`}
+                      onOpen={() => {
+                        setFormEntry(entry);
+                        setFormOpen(true);
+                      }}
+                    >
+                      <span
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ backgroundColor: roleColorVar(project?.color) }}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm">
+                          {timeEntryProjectName(entry.projectId, project)}
+                          {entry.description ? (
+                            <span className="text-muted"> · {entry.description}</span>
+                          ) : null}
+                        </span>
+                        <span className="text-faint block text-xs">
+                          {formatDateShort(entry.startTime)} · {formatTimeOfDay(entry.startTime)}
+                          {entry.endTime ? ` - ${formatTimeOfDay(entry.endTime)}` : ""}
+                        </span>
                       </span>
-                      <span className="text-faint block text-xs">
-                        {formatDateShort(entry.startTime)} · {formatTimeOfDay(entry.startTime)}
-                        {entry.endTime ? ` - ${formatTimeOfDay(entry.endTime)}` : ""}
-                      </span>
-                    </span>
-                    {running ? (
-                      <Badge tone="accent">läuft</Badge>
-                    ) : (
-                      <span className="flex shrink-0 items-center gap-1">
-                        <span className="tabular font-mono text-sm">
+                      {running ? (
+                        <Badge tone="accent">läuft</Badge>
+                      ) : (
+                        <span className="tabular shrink-0 font-mono text-sm">
                           {formatDuration(entry.duration)}
                         </span>
-                        {can.trackTime && entry.description.trim() ? (
-                          <button
-                            type="button"
-                            onClick={() => void restartEntry(entry)}
-                            disabled={restartingId !== null}
-                            aria-label={`Weitertracken: ${entry.description}`}
-                            title="Mit denselben Angaben weitertracken"
-                            className="text-faint hover:text-accent hover:bg-accent-soft rounded-sm p-1 disabled:opacity-50"
-                          >
-                            <Play className="size-3.5 fill-current" aria-hidden />
-                          </button>
-                        ) : null}
-                      </span>
-                    )}
+                      )}
+                    </EntryOpenTarget>
+                    <span className="flex shrink-0 items-center gap-0.5">
+                      {!running && can.trackTime && entry.description.trim() ? (
+                        <button
+                          type="button"
+                          onClick={() => void restartEntry(entry)}
+                          disabled={restartingId !== null}
+                          aria-label={`Weitertracken: ${entry.description}`}
+                          title="Mit denselben Angaben weitertracken"
+                          className="text-faint hover:text-accent hover:bg-accent-soft rounded-sm p-1 disabled:opacity-50"
+                        >
+                          <Play className="size-3.5 fill-current" aria-hidden />
+                        </button>
+                      ) : null}
+                      {editable ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconOnly
+                          aria-label="Eintrag löschen"
+                          className="hover:text-danger md:opacity-0 md:transition-opacity md:group-focus-within:opacity-100 md:group-hover:opacity-100"
+                          onClick={() => setPendingDelete(entry)}
+                        >
+                          <Trash2 className="size-3.5" aria-hidden />
+                        </Button>
+                      ) : null}
+                    </span>
                   </li>
                 );
               })}
@@ -256,6 +302,31 @@ export default function DashboardPage() {
           )}
         </CardBody>
       </Card>
+
+      {activeBandId && user ? (
+        <ManualEntryForm
+          open={formOpen}
+          onClose={() => setFormOpen(false)}
+          bandId={activeBandId}
+          userId={user.uid}
+          projects={projects}
+          entry={formEntry}
+          existingEntries={recent}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => void onDelete()}
+        loading={busy}
+        title="Eintrag löschen?"
+        description={
+          pendingDelete
+            ? `${formatDuration(pendingDelete.duration)} auf "${timeEntryProjectName(pendingDelete.projectId, pendingDelete.projectId ? byId.get(pendingDelete.projectId) : undefined)}" werden entfernt.`
+            : ""
+        }
+      />
     </div>
   );
 }
