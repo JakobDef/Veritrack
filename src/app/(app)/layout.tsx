@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { RunningTimerBar } from "@/components/timer/RunningTimerBar";
+import { RunningTabTitle } from "@/components/timer/RunningTabTitle";
 import { Wordmark } from "@/components/brand/Logo";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { useAuth } from "@/providers/AuthProvider";
@@ -37,6 +38,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh">
+      <RunningTabTitle />
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="border-border bg-bg/85 sticky top-0 z-30 border-b backdrop-blur">
