@@ -159,3 +159,25 @@ export function entryDescriptionError(description: string): string | null {
   }
   return null;
 }
+
+/** Whole-minute instant. 14:14:00 and 14:14:59 are the same minute. */
+export function toMinute(date: Date): number {
+  return Math.floor(date.getTime() / MS_PER_MINUTE);
+}
+
+/**
+ * Half-open ranges on whole minutes: `[start, end)`.
+ *
+ * The edit form stores only `HH:mm`, so a timer that stopped at 14:14:32
+ * becomes 14:14:00. Millisecond overlap would then reject a following entry
+ * that started in the same minute. Touching at the boundary minute is allowed;
+ * starting a minute earlier is not.
+ */
+export function rangesOverlapAtMinute(
+  aStart: Date,
+  aEnd: Date,
+  bStart: Date,
+  bEnd: Date,
+): boolean {
+  return toMinute(aStart) < toMinute(bEnd) && toMinute(bStart) < toMinute(aEnd);
+}

@@ -11,6 +11,7 @@ import {
   combineLocalDateTime,
   entryRangeError,
   entryDescriptionError,
+  rangesOverlapAtMinute,
   toMinutes,
 } from "@/lib/time";
 
@@ -210,5 +211,30 @@ describe("entryDescriptionError", () => {
   it("accepts real text", () => {
     expect(entryDescriptionError("Soundcheck")).toBeNull();
     expect(entryDescriptionError("  Soundcheck  ")).toBeNull();
+  });
+});
+
+describe("rangesOverlapAtMinute", () => {
+  const at = (h: number, m: number, s = 0) => new Date(2026, 7, 14, h, m, s);
+
+  it("allows entries that only touch at the boundary minute", () => {
+    expect(rangesOverlapAtMinute(at(14, 0), at(14, 14), at(14, 14), at(14, 26))).toBe(false);
+    expect(rangesOverlapAtMinute(at(14, 14), at(14, 26), at(14, 0), at(14, 14))).toBe(false);
+  });
+
+  it("ignores seconds so a stop at 14:14:32 can be followed by 14:14", () => {
+    expect(rangesOverlapAtMinute(at(14, 0), at(14, 14, 32), at(14, 14, 0), at(14, 26))).toBe(false);
+  });
+
+  it("rejects a start one minute into the other range", () => {
+    expect(rangesOverlapAtMinute(at(14, 0), at(14, 14), at(14, 13), at(14, 26))).toBe(true);
+  });
+
+  it("rejects a range contained in another", () => {
+    expect(rangesOverlapAtMinute(at(14, 0), at(14, 30), at(14, 10), at(14, 20))).toBe(true);
+  });
+
+  it("allows disjoint ranges", () => {
+    expect(rangesOverlapAtMinute(at(14, 0), at(14, 10), at(14, 11), at(14, 20))).toBe(false);
   });
 });

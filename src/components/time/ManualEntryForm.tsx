@@ -17,6 +17,7 @@ import {
   entryRangeError,
   formatDuration,
   normalizeClockInput,
+  rangesOverlapAtMinute,
   toMinutes,
 } from "@/lib/time";
 import { UNASSIGNED_PROJECT_KEY, type Project, type TimeEntry } from "@/types/models";
@@ -143,7 +144,9 @@ export function ManualEntryForm({
   const minutes = startAt && endAt ? toMinutes(startAt, endAt) : 0;
 
   /**
-   * Overlap check against the caller's other entries.
+   * Overlap check against the caller's other entries, at whole-minute
+   * resolution. Touching at the boundary minute (14:00-14:14 then 14:14-14:26)
+   * is allowed; starting a minute into the other range is not.
    *
    * A still-running entry counts too, treated as ending now, otherwise a
    * retroactive entry could be dropped on top of the timer that is ticking
@@ -157,7 +160,7 @@ export function ManualEntryForm({
       ? existingEntries.find((other) => {
           if (other.id === entry?.id) return false;
           const otherEnd = other.endTime ?? new Date();
-          return other.startTime.getTime() < endAt!.getTime() && startAt.getTime() < otherEnd.getTime();
+          return rangesOverlapAtMinute(startAt, endAt, other.startTime, otherEnd);
         })
       : undefined;
 
